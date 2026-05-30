@@ -885,10 +885,17 @@
             if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
                 layer.bringToFront();
             }
+
+            // Update the top-center header card dynamically on hover!
+            const typeLabel = getLocalBodyTypeLabel(layer.feature.properties.code);
+            const fullTitle = typeLabel ? `${layer.feature.properties.name} - ${typeLabel}` : layer.feature.properties.name;
+            document.getElementById("city-header-name").innerText = fullTitle;
         }
 
         function resetUlbHighlight(e) {
             ulbLayer.resetStyle(e.target);
+            // Restore default Punjab state view title
+            document.getElementById("city-header-name").innerText = "PUNJAB - Civic Election Results 2026";
         }
 
         function mountStateView() {
@@ -898,7 +905,11 @@
 
             // Update UI elements
             document.getElementById("navigation-banner").style.display = "none";
-            document.getElementById("city-header-overlay").style.display = "none";
+            
+            // Bring the header card to stand here always on the State View!
+            document.getElementById("city-header-overlay").style.display = "block";
+            document.getElementById("city-header-name").innerText = "PUNJAB - Civic Election Results 2026";
+            
             document.getElementById("search-input").placeholder = "Search by city...";
             document.getElementById("search-input").value = "";
             document.getElementById("list-title-label").innerText = "Elected Cities";

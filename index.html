@@ -638,6 +638,30 @@
             border-radius: 8px !important;
             font-family: 'Outfit', sans-serif !important;
         }
+
+        /* City label tooltip styling */
+        .city-label-tooltip {
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            color: #0f172a;
+            font-size: 8px;
+            font-weight: 800;
+            font-family: 'Outfit', sans-serif;
+            text-align: center;
+            text-shadow: 
+                -1px -1px 0 #fff, 1px -1px 0 #fff,
+                -1px 1px 0 #fff, 1px 1px 0 #fff,
+                0 -1px 0 #fff, 0 1px 0 #fff,
+                -1px 0 0 #fff, 1px 0 0 #fff;
+            padding: 0 !important;
+            margin: 0 !important;
+            line-height: 1.1 !important;
+        }
+
+        .city-label-tooltip::before {
+            display: none !important;
+        }
     </style>
 </head>
 <body>
@@ -799,6 +823,7 @@
         let ulbLayer = null;
         let wardLayer = null;
         let wardLabels = [];  // Store ward label markers
+        let cityLabels = [];  // Store state-view city label markers
         
         let currentView = "state"; // "state" or "city"
         let selectedCityName = "";
@@ -925,6 +950,7 @@
             if (ulbLayer) {
                 map.removeLayer(ulbLayer);
             }
+            clearCityLabels();
 
             ulbLayer = L.geoJSON(electionUlbsData, {
                 style: styleUlbFeature,
@@ -937,6 +963,20 @@
                         direction: 'top',
                         className: 'ulb-hover-tooltip'
                     });
+
+                    // Add permanent on-map text label at the center of the city polygon shape
+                    const name = feature.properties.name;
+                    const shortType = getLocalBodyTypeShort(feature.properties.code);
+                    const center = layer.getBounds().getCenter();
+                    const label = L.tooltip({
+                        permanent: true,
+                        direction: 'center',
+                        className: 'city-label-tooltip'
+                    });
+                    label.setContent(`<div style="font-weight: 800; font-size: 8px;">${name}</div><div style="font-size: 6.5px; font-weight: 600; color: #475569; margin-top: 1px;">${shortType}</div>`);
+                    label.setLatLng(center);
+                    label.addTo(map);
+                    cityLabels.push(label);
 
                     layer.on({
                         mouseover: highlightUlb,
@@ -1089,6 +1129,7 @@
             if (ulbLayer) {
                 map.removeLayer(ulbLayer);
             }
+            clearCityLabels();
 
             // Show Back navigation banner & City Header
             const typeLabel = getLocalBodyTypeLabel(cityFeature.properties.code);
@@ -1301,6 +1342,24 @@
         function clearWardLabels() {
             wardLabels.forEach(label => map.removeLayer(label));
             wardLabels = [];
+        }
+
+        // Clear state view city labels utility
+        function clearCityLabels() {
+            cityLabels.forEach(label => map.removeLayer(label));
+            cityLabels = [];
+        }
+
+        // Get local body type short abbreviation
+        function getLocalBodyTypeShort(code) {
+            if (!code) return "";
+            const c = code.toUpperCase().trim();
+            if (c === "MUNICIPAL CORPORATION") return "Corp";
+            if (c === "NAGAR PANCHAYAT") return "NP";
+            if (c.includes("CLASS-I") || c === "CLASS I") return "MC(I)";
+            if (c.includes("CLASS-II") || c === "CLASS II") return "MC(II)";
+            if (c.includes("CLASS-III") || c === "CLASS III") return "MC(III)";
+            return c;
         }
 
         // ==========================================

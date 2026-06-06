@@ -629,6 +629,30 @@
             display: none !important;
         }
 
+        /* Boundary name labels for Clean View in caste mode */
+        .boundary-name-label {
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            color: #1e293b;
+            font-size: 11px;
+            font-weight: 700;
+            font-family: 'Outfit', sans-serif;
+            text-shadow: 
+                -1px -1px 0 #fff, 1px -1px 0 #fff,
+                -1px 1px 0 #fff, 1px 1px 0 #fff,
+                0 -1px 0 #fff, 0 1px 0 #fff,
+                -1px 0 0 #fff, 1px 0 0 #fff,
+                0 0 4px rgba(255,255,255,0.9);
+            padding: 0 !important;
+            margin: 0 !important;
+            white-space: nowrap;
+        }
+
+        .boundary-name-label::before {
+            display: none !important;
+        }
+
         /* ULB Hover Tooltip styling */
         .ulb-hover-tooltip {
             background: rgba(255, 255, 255, 0.98) !important;
@@ -637,6 +661,226 @@
             padding: 6px 12px !important;
             border-radius: 8px !important;
             font-family: 'Outfit', sans-serif !important;
+        }
+
+        /* Premium Floating Mode Selector */
+        .mode-selector-container {
+            position: absolute;
+            top: 16px;
+            right: 60px; /* Offset to not overlap zoom controls */
+            z-index: 1000;
+        }
+
+        .mode-selector-btn {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(var(--blur-strength));
+            -webkit-backdrop-filter: blur(var(--blur-strength));
+            border: 1px solid var(--border-light);
+            border-radius: 10px;
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text-primary);
+            box-shadow: 0 4px 18px rgba(0, 0, 0, 0.05);
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .mode-selector-btn:hover {
+            background: #ffffff;
+            border-color: rgba(37, 99, 235, 0.2);
+            transform: translateY(-1px);
+            box-shadow: 0 6px 24px rgba(0, 0, 0, 0.08);
+        }
+
+        .mode-selector-btn i.fa-chevron-down {
+            font-size: 10px;
+            color: var(--text-muted);
+            transition: transform 0.2s;
+        }
+
+        .mode-selector-btn.open i.fa-chevron-down {
+            transform: rotate(180deg);
+        }
+
+        .mode-dropdown-menu {
+            position: absolute;
+            top: calc(100% + 8px);
+            right: 0;
+            background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(var(--blur-strength));
+            -webkit-backdrop-filter: blur(var(--blur-strength));
+            border: 1px solid var(--border-light);
+            border-radius: 12px;
+            padding: 6px;
+            width: 320px;
+            box-shadow: var(--shadow-popup);
+            display: none;
+            flex-direction: column;
+            gap: 4px;
+            animation: fadeIn 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .mode-dropdown-item {
+            padding: 10px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            transition: all 0.2s;
+        }
+
+        .mode-dropdown-item:hover {
+            background: rgba(37, 99, 235, 0.05);
+        }
+
+        .mode-dropdown-item.active {
+            background: rgba(37, 99, 235, 0.08);
+            border-left: 3px solid #2563eb;
+        }
+
+        .mode-item-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .mode-item-desc {
+            font-size: 10px;
+            color: var(--text-secondary);
+        }
+
+        /* Caste Filter in Sidebar */
+        .caste-filter-container {
+            padding: 14px 24px 8px 24px;
+            border-bottom: 1px solid var(--border-light);
+            background: rgba(0, 0, 0, 0.005);
+            display: none;
+        }
+
+        .caste-filter-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 800;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .caste-select {
+            width: 100%;
+            padding: 10px 14px;
+            background: #ffffff;
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 13px;
+            font-weight: 600;
+            outline: none;
+            cursor: pointer;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.01);
+            transition: all 0.2s;
+        }
+
+        .caste-select:focus {
+            border-color: var(--border-focus);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
+        }
+
+        /* Caste breakdown progress bars styling */
+        .caste-breakdown-container {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 10px;
+            max-height: 250px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        .caste-breakdown-row {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .caste-breakdown-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .caste-breakdown-bar-bg {
+            background: #e2e8f0;
+            height: 6px;
+            border-radius: 3px;
+            overflow: hidden;
+            width: 100%;
+        }
+
+        .caste-breakdown-bar {
+            background: linear-gradient(90deg, #6366f1, #4f46e5);
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.3s ease;
+        }
+
+        /* Category Selector Buttons in Sidebar */
+        .caste-category-selector {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+
+        .caste-cat-btn {
+            background: #f8fafc;
+            border: 1px solid #cbd5e1;
+            color: #64748b;
+            padding: 6px 10px;
+            font-size: 10px;
+            font-weight: 800;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            font-family: inherit;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+        }
+
+        .caste-cat-btn:hover {
+            background: #f1f5f9;
+            border-color: #94a3b8;
+            color: #334155;
+            transform: translateY(-0.5px);
+        }
+
+        .caste-cat-btn.active[data-cat="ALL"] { background: #64748b; color: white; border-color: #64748b; box-shadow: 0 2px 6px rgba(100, 116, 139, 0.25); }
+        .caste-cat-btn.active[data-cat="GEN"] { background: #16a34a; color: white; border-color: #16a34a; box-shadow: 0 2px 6px rgba(22, 163, 74, 0.25); }
+        .caste-cat-btn.active[data-cat="OBC"] { background: #ea580c; color: white; border-color: #ea580c; box-shadow: 0 2px 6px rgba(234, 88, 12, 0.25); }
+        .caste-cat-btn.active[data-cat="SC"] { background: #2563eb; color: white; border-color: #2563eb; box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25); }
+        .caste-cat-btn.active[data-cat="MIN"] { background: #9333ea; color: white; border-color: #9333ea; box-shadow: 0 2px 6px rgba(147, 51, 234, 0.25); }
+        .caste-cat-btn.active[data-cat="Others"] { background: #475569; color: white; border-color: #475569; box-shadow: 0 2px 6px rgba(71, 85, 105, 0.25); }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-8px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        /* Remove default browser focus outline ring on clicked Leaflet vector features */
+        .leaflet-interactive:focus {
+            outline: none !important;
         }
     </style>
 </head>
@@ -658,6 +902,23 @@
                     <i class="fa-solid fa-magnifying-glass"></i>
                     <input type="text" id="search-input" class="search-input" placeholder="Search by city...">
                 </div>
+            </div>
+            
+            <!-- Caste Filter Dropdown (visible in Caste Mode) -->
+            <div id="caste-filter-container" class="caste-filter-container">
+                <span class="caste-filter-label">Filter by Caste Category</span>
+                <div class="caste-category-selector">
+                    <button class="caste-cat-btn active" data-cat="ALL" onclick="filterCasteDropdown('ALL')">All</button>
+                    <button class="caste-cat-btn" data-cat="GEN" onclick="filterCasteDropdown('GEN')">GEN</button>
+                    <button class="caste-cat-btn" data-cat="OBC" onclick="filterCasteDropdown('OBC')">OBC</button>
+                    <button class="caste-cat-btn" data-cat="SC" onclick="filterCasteDropdown('SC')">SC</button>
+                    <button class="caste-cat-btn" data-cat="MIN" onclick="filterCasteDropdown('MIN')">MIN</button>
+                    <button class="caste-cat-btn" data-cat="Others" onclick="filterCasteDropdown('Others')">Others</button>
+                </div>
+                <span class="caste-filter-label" style="margin-top: 8px;">Visualize Caste Distribution</span>
+                <select id="caste-select" class="caste-select" onchange="handleCasteSelectChange(this.value)">
+                    <option value="__ALL__" selected>📊 All Castes Overview (Default)</option>
+                </select>
             </div>
             
             <!-- Navigation Banner for Wards backflow -->
@@ -698,6 +959,25 @@
         
         <!-- Leaflet Map Container -->
         <div id="map">
+            <!-- Premium Floating Mode Selector -->
+            <div class="mode-selector-container">
+                <div id="mode-selector-btn" class="mode-selector-btn" onclick="toggleModeDropdown(event)">
+                    <i class="fa-solid fa-layer-group"></i>
+                    <span id="active-mode-label">Punjab Civic Polls - Results 2026</span>
+                    <i class="fa-solid fa-chevron-down"></i>
+                </div>
+                <div id="mode-dropdown-menu" class="mode-dropdown-menu">
+                    <div class="mode-dropdown-item active" id="mode-item-election" onclick="switchAppMode('election')">
+                        <span class="mode-item-title">🗳️ Punjab Civic Polls</span>
+                        <span class="mode-item-desc">Civic Election Results 2026 & Ward Details</span>
+                    </div>
+                    <div class="mode-dropdown-item" id="mode-item-caste" onclick="switchAppMode('caste')">
+                        <span class="mode-item-title">📊 Caste Based Mapping</span>
+                        <span class="mode-item-desc">Demographic distribution across administrative boundaries</span>
+                    </div>
+                </div>
+            </div>
+
             <!-- City Header Overlay (shown on drill-down) -->
             <div id="city-header-overlay" class="city-header-overlay" style="display:none;">
                 <div id="city-header-name" class="city-header-name"></div>
@@ -713,17 +993,27 @@
     <script src="punjab_boundary.js"></script>
     <!-- Joined GeoJSON Javascript Data (election_data.js) -->
     <script src="election_data.js"></script>
+    <!-- Punjab Assembly & Parliamentary Constituencies Data -->
+    <script src="punjab_constituencies.js"></script>
+    <!-- Punjab Caste Data (Generated) -->
+    <script src="caste_data.js"></script>
     
     <script>
         // Init Map Control
         const map = L.map('map', {
             zoomControl: false,
             attributionControl: false,
-            preferCanvas: true,
             zoomSnap: 0,              // Enables smooth fractional zooming on trackpads / touch pinch
             minZoom: 6,               // Allow zooming out very far to a lower scale
             maxZoom: 20               // Allow zooming in extremely close
         }).setView([31.1471, 75.3412], 8);
+
+        // Create custom panes for proper layering
+        map.createPane('adminPane');
+        map.getPane('adminPane').style.zIndex = 400;
+        
+        map.createPane('localBodyPane');
+        map.getPane('localBodyPane').style.zIndex = 450;
 
         L.control.zoom({ position: 'topright' }).addTo(map);
 
@@ -770,16 +1060,180 @@
             "🧼 Clean View (Boundaries Only)": cleanLayer
         };
 
-        // Add Layer Control to top right
-        L.control.layers(baseMaps, {}, { collapsed: false, position: 'topright' }).addTo(map);
+        // ------------------------------------------
+        // DISTRICTS, ASSEMBLY & PARLIAMENTARY CONSTITUENCIES
+        // ------------------------------------------
+        // Dynamic hover highlighting for administrative layers
+        function highlightAdminFeature(e, layerName, layerGroup) {
+            const layer = e.target;
+            // Both modes: ONLY highlight border, absolutely NO fill
+            let highlightColor = '#0f766e';
+            if (layerName === 'ac') highlightColor = '#9f1239';
+            else if (layerName === 'pc') highlightColor = '#3730a3';
+            else if (layerName === 'od') highlightColor = '#b45309';
+            
+            layer.setStyle({
+                weight: layerName === 'ac' ? 2.5 : (layerName === 'pc' ? 3.5 : 3),
+                color: highlightColor,
+                opacity: 1,
+                fill: true,
+                fillColor: 'transparent',
+                fillOpacity: 0
+            });
+            if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
+                layer.bringToFront();
+            }
+        }
+
+        function resetAdminFeatureHighlight(e, layerName, layerGroup) {
+            const layer = e.target;
+            // Both modes: reset to outline-only style (no fill)
+            layerGroup.resetStyle(layer);
+        }
+
+        const districtLayer = L.geoJSON(punjabDistrictData, {
+            pane: 'adminPane',
+            style: {
+                fill: true,
+                fillOpacity: 0,
+                weight: 2,
+                color: '#0d9488', // Nice teal color for districts
+                opacity: 0.85
+            },
+            onEachFeature: function(feature, layer) {
+                const props = feature.properties;
+                const distName = props.Dist_Name || props.dist_name || props.name || "Unknown";
+                
+                layer.bindTooltip(`
+                    <div style="font-family:'Outfit',sans-serif; padding:2px 4px; text-align:center;">
+                        <div style="font-weight:700; font-size:12px; color:#0d9488;">${distName} District</div>
+                    </div>
+                `, { sticky: true, className: 'ulb-hover-tooltip' });
+
+                layer.on({
+                    mouseover: function(e) {
+                        highlightAdminFeature(e, 'district', districtLayer);
+                    },
+                    mouseout: function(e) {
+                        resetAdminFeatureHighlight(e, 'district', districtLayer);
+                    }
+                });
+            }
+        });
+
+        const assemblyLayer = L.geoJSON(punjabAssemblyData, {
+            pane: 'adminPane',
+            style: {
+                fill: true,
+                fillOpacity: 0,
+                weight: 1.5,
+                color: '#be123c', // Nice rose/crimson color for assembly
+                opacity: 0.8
+            },
+            onEachFeature: function(feature, layer) {
+                const props = feature.properties;
+                const acName = props.AC_NAME || props.ac_name || "Unknown";
+                const acNo = props.AC_NO || props.ac_no || "";
+                const distName = props.DIST_NAME || props.dist_name || "";
+                
+                layer.bindTooltip(`
+                    <div style="font-family:'Outfit',sans-serif; padding:2px 4px;">
+                        <div style="font-weight:700; font-size:12px; color:#be123c;">${acName} (AC No. ${acNo})</div>
+                        <div style="font-size:10px; color:#475569; margin-top:2px;">District: ${distName}</div>
+                    </div>
+                `, { sticky: true, className: 'ulb-hover-tooltip' });
+                
+                layer.on({
+                    mouseover: function(e) {
+                        highlightAdminFeature(e, 'ac', assemblyLayer);
+                    },
+                    mouseout: function(e) {
+                        resetAdminFeatureHighlight(e, 'ac', assemblyLayer);
+                    }
+                });
+            }
+        });
+
+        const parliamentLayer = L.geoJSON(punjabParliamentData, {
+            pane: 'adminPane',
+            style: {
+                fill: true,
+                fillOpacity: 0,
+                weight: 2.5,
+                color: '#4338ca', // indigo color for parliamentary
+                opacity: 0.9
+            },
+            onEachFeature: function(feature, layer) {
+                const props = feature.properties;
+                const pcName = props.PC_NAME || props.pc_name || "Unknown";
+                const pcNo = props.PC_NO || props.pc_no || "";
+                
+                layer.bindTooltip(`
+                    <div style="font-family:'Outfit',sans-serif; padding:2px 4px;">
+                        <div style="font-weight:700; font-size:12px; color:#4338ca;">${pcName} Parliamentary Constituency</div>
+                        <div style="font-size:10px; color:#475569; margin-top:2px;">PC No. ${pcNo}</div>
+                    </div>
+                `, { sticky: true, className: 'ulb-hover-tooltip' });
+
+                layer.on({
+                    mouseover: function(e) {
+                        highlightAdminFeature(e, 'pc', parliamentLayer);
+                    },
+                    mouseout: function(e) {
+                        resetAdminFeatureHighlight(e, 'pc', parliamentLayer);
+                    }
+                });
+            }
+        });
+
+        const odLayer = L.geoJSON(punjabODData, {
+            pane: 'adminPane',
+            style: {
+                fill: true,
+                fillOpacity: 0,
+                weight: 2,
+                color: '#d97706', // Nice dark amber/gold color for OD
+                opacity: 0.85
+            },
+            onEachFeature: function(feature, layer) {
+                const props = feature.properties;
+                const odName = props.name || "Unknown";
+                const totalAcs = props.total_acs || 0;
+                
+                layer.bindTooltip(`
+                    <div style="font-family:'Outfit',sans-serif; padding:2px 4px;">
+                        <div style="font-weight:700; font-size:12px; color:#d97706;">${odName} Org. District</div>
+                        <div style="font-size:10px; color:#475569; margin-top:2px;">Contains ${totalAcs} Assembly Constituencies</div>
+                    </div>
+                `, { sticky: true, className: 'ulb-hover-tooltip' });
+
+                layer.on({
+                    mouseover: function(e) {
+                        highlightAdminFeature(e, 'od', odLayer);
+                    },
+                    mouseout: function(e) {
+                        resetAdminFeatureHighlight(e, 'od', odLayer);
+                    }
+                });
+            }
+        });
+
+        const overlayMaps = {
+            "📍 District Boundaries": districtLayer,
+            "🏢 Organizational Districts": odLayer,
+            "🗳️ Assembly Constituencies": assemblyLayer,
+            "🏛️ Parliamentary Constituencies": parliamentLayer
+        };
+
+        // Add Layer Control to top right with both base maps and overlays
+        L.control.layers(baseMaps, overlayMaps, { collapsed: false, position: 'topright' }).addTo(map);
 
         // ==========================================
         // PUNJAB STATE BOUNDARY OUTLINE
         // ==========================================
         const stateBoundaryLayer = L.geoJSON(punjabStateBoundary, {
             style: {
-                fillColor: 'transparent',
-                fillOpacity: 0,
+                fill: false,
                 weight: 2.5,
                 color: '#1e293b',
                 opacity: 0.7,
@@ -803,6 +1257,749 @@
         let currentView = "state"; // "state" or "city"
         let selectedCityName = "";
         let selectedCityFeature = null;
+
+        // Caste Mapping Mode State Variables
+        let currentMode = "election"; // "election" or "caste"
+        let activeCasteLayer = "district"; // "district", "ac"
+        let selectedCaste = "__ALL__"; // "__ALL__" for overview, or a specific caste name
+        let activeCategoryFilter = "ALL"; // "ALL", "GEN", "OBC", "SC", "MIN", "Others"
+
+        function filterCasteDropdown(cat) {
+            activeCategoryFilter = cat;
+            
+            // Update active class on buttons
+            document.querySelectorAll(".caste-cat-btn").forEach(btn => {
+                if (btn.getAttribute("data-cat") === cat) {
+                    btn.classList.add("active");
+                } else {
+                    btn.classList.remove("active");
+                }
+            });
+            
+            // Repopulate select
+            populateCasteDropdown();
+            
+            // Reset selectedCaste to "__ALL__" if not in the new category
+            if (selectedCaste !== "__ALL__") {
+                const currentCat = casteCategories[selectedCaste] || "Others";
+                if (currentCat !== cat && cat !== "ALL") {
+                    selectedCaste = "__ALL__";
+                    document.getElementById("caste-select").value = "__ALL__";
+                }
+            }
+            
+            // Re-render layer to show updated category or caste details
+            setActiveCasteLayer(activeCasteLayer);
+        }
+
+        // Mode Switching and Dropdown Functions
+        function toggleModeDropdown(event) {
+            if (event) event.stopPropagation();
+            const btn = document.getElementById("mode-selector-btn");
+            const menu = document.getElementById("mode-dropdown-menu");
+            if (!menu || !btn) return;
+            const isOpen = menu.style.display === "flex";
+            if (isOpen) {
+                menu.style.display = "none";
+                btn.classList.remove("open");
+            } else {
+                menu.style.display = "flex";
+                btn.classList.add("open");
+            }
+        }
+
+        window.addEventListener("click", function() {
+            const btn = document.getElementById("mode-selector-btn");
+            const menu = document.getElementById("mode-dropdown-menu");
+            if (menu && menu.style.display === "flex") {
+                menu.style.display = "none";
+                if (btn) btn.classList.remove("open");
+            }
+        });
+
+        function switchAppMode(mode) {
+            if (currentMode === mode) return;
+            currentMode = mode;
+
+            document.querySelectorAll(".mode-dropdown-item").forEach(item => {
+                item.classList.remove("active");
+            });
+            
+            if (mode === "election") {
+                document.getElementById("mode-item-election").classList.add("active");
+                document.getElementById("active-mode-label").innerText = "Punjab Civic Polls - Results 2026";
+                document.getElementById("caste-filter-container").style.display = "none";
+                
+                // Clear boundary name labels from caste mode
+                clearBoundaryNameLabels();
+                
+                // Restore brand name
+                document.querySelector(".brand-title").innerText = "Punjab Civic Polls";
+                document.querySelector(".brand-subtitle").innerText = "Civic Election Results 2026";
+                
+                // Reset styles of administrative layers back to default outlines
+                resetAdminLayerStyles();
+                
+                // Hide administrative layers unless explicitly toggled
+                map.removeLayer(districtLayer);
+                map.removeLayer(assemblyLayer);
+                map.removeLayer(parliamentLayer);
+                map.removeLayer(odLayer);
+                
+                // Mount standard election view
+                if (currentView === "city" && selectedCityFeature) {
+                    drilldownToCity(selectedCityFeature);
+                } else {
+                    mountStateView();
+                }
+            } else {
+                document.getElementById("mode-item-caste").classList.add("active");
+                document.getElementById("active-mode-label").innerText = "Punjab Caste Based Mapping";
+                document.getElementById("caste-filter-container").style.display = "block";
+                
+                // Change brand name to reflect Caste Mapping
+                document.querySelector(".brand-title").innerText = "Punjab Caste Map";
+                document.querySelector(".brand-subtitle").innerText = "Demographic Data Explorer";
+                
+                // Remove election layers (ULBs and Wards)
+                if (ulbLayer) map.removeLayer(ulbLayer);
+                if (wardLayer) {
+                    map.removeLayer(wardLayer);
+                    wardLayer = null;
+                }
+                clearWardLabels();
+                document.getElementById("city-header-overlay").style.display = "none";
+                document.getElementById("navigation-banner").style.display = "none";
+                
+                // Populate caste select dropdown if not already populated
+                populateCasteDropdown();
+                
+                // Activate default caste layer
+                setActiveCasteLayer(activeCasteLayer);
+            }
+        }
+
+        function resetAdminLayerStyles() {
+            // Close any open popups on the map
+            map.closePopup();
+
+            districtLayer.setStyle({
+                fill: true,
+                fillOpacity: 0,
+                weight: 2,
+                color: '#0d9488',
+                opacity: 0.85
+            });
+            districtLayer.eachLayer(l => {
+                const props = l.feature.properties;
+                const distName = props.Dist_Name || props.dist_name || props.name || "Unknown";
+                l.bindTooltip(`
+                    <div style="font-family:'Outfit',sans-serif; padding:2px 4px; text-align:center;">
+                        <div style="font-weight:700; font-size:12px; color:#0d9488;">${distName} District</div>
+                    </div>
+                `, { sticky: true, className: 'ulb-hover-tooltip' });
+                l.off('click');
+            });
+
+            assemblyLayer.setStyle({
+                fill: true,
+                fillOpacity: 0,
+                weight: 1.5,
+                color: '#be123c',
+                opacity: 0.8
+            });
+            assemblyLayer.eachLayer(l => {
+                const props = l.feature.properties;
+                const acName = props.AC_NAME || props.ac_name || "Unknown";
+                const acNo = props.AC_NO || props.ac_no || "";
+                const distName = props.DIST_NAME || props.dist_name || "";
+                l.bindTooltip(`
+                    <div style="font-family:'Outfit',sans-serif; padding:2px 4px;">
+                        <div style="font-weight:700; font-size:12px; color:#be123c;">${acName} (AC No. ${acNo})</div>
+                        <div style="font-size:10px; color:#475569; margin-top:2px;">District: ${distName}</div>
+                    </div>
+                `, { sticky: true, className: 'ulb-hover-tooltip' });
+                l.off('click');
+            });
+
+            parliamentLayer.setStyle({
+                fill: true,
+                fillOpacity: 0,
+                weight: 2.5,
+                color: '#4338ca',
+                opacity: 0.9
+            });
+            parliamentLayer.eachLayer(l => {
+                const props = l.feature.properties;
+                const pcName = props.PC_NAME || props.pc_name || "Unknown";
+                const pcNo = props.PC_NO || props.pc_no || "";
+                l.bindTooltip(`
+                    <div style="font-family:'Outfit',sans-serif; padding:2px 4px;">
+                        <div style="font-weight:700; font-size:12px; color:#4338ca;">${pcName} Parliamentary Constituency</div>
+                        <div style="font-size:10px; color:#475569; margin-top:2px;">PC No. ${pcNo}</div>
+                    </div>
+                `, { sticky: true, className: 'ulb-hover-tooltip' });
+                l.off('click');
+            });
+
+            odLayer.setStyle({
+                fill: true,
+                fillOpacity: 0,
+                weight: 2,
+                color: '#d97706',
+                opacity: 0.85
+            });
+            odLayer.eachLayer(l => {
+                const props = l.feature.properties;
+                const odName = props.name || "Unknown";
+                const totalAcs = props.total_acs || 0;
+                l.bindTooltip(`
+                    <div style="font-family:'Outfit',sans-serif; padding:2px 4px;">
+                        <div style="font-weight:700; font-size:12px; color:#d97706;">${odName} Org. District</div>
+                        <div style="font-size:10px; color:#475569; margin-top:2px;">Contains ${totalAcs} Assembly Constituencies</div>
+                    </div>
+                `, { sticky: true, className: 'ulb-hover-tooltip' });
+                l.off('click');
+            });
+        }
+
+        function populateCasteDropdown() {
+            const select = document.getElementById("caste-select");
+            select.innerHTML = '';
+            
+            // "All Castes Overview" option
+            const overviewOpt = document.createElement("option");
+            overviewOpt.value = "__ALL__";
+            overviewOpt.innerText = activeCategoryFilter === "ALL" ? "📊 All Castes Overview (Default)" : `📊 ${activeCategoryFilter} Category Overview`;
+            select.appendChild(overviewOpt);
+
+            // Group castes by category
+            const catOrder = ['GEN', 'OBC', 'SC', 'MIN', 'Others'];
+            const catLabels = { GEN: '🟢 General (GEN)', OBC: '🟠 OBC', SC: '🔵 SC', MIN: '🟣 Minorities', Others: '⚪ Others' };
+            catOrder.forEach(cat => {
+                if (activeCategoryFilter !== "ALL" && activeCategoryFilter !== cat) return;
+                
+                const optGroup = document.createElement("optgroup");
+                optGroup.label = catLabels[cat] || cat;
+                allCastes.forEach(caste => {
+                    if ((casteCategories[caste] || 'Others') === cat) {
+                        const opt = document.createElement("option");
+                        opt.value = caste;
+                        opt.innerText = caste;
+                        optGroup.appendChild(opt);
+                    }
+                });
+                if (optGroup.children.length > 0) {
+                    select.appendChild(optGroup);
+                }
+            });
+            select.value = selectedCaste;
+        }
+
+        function setActiveCasteLayer(layerName) {
+            activeCasteLayer = layerName;
+            
+            // Remove all administrative layers from map
+            map.removeLayer(districtLayer);
+            map.removeLayer(assemblyLayer);
+            map.removeLayer(parliamentLayer);
+            map.removeLayer(odLayer);
+            
+            resetAdminLayerStyles();
+            
+            let targetLayer = null;
+            if (layerName === "district") targetLayer = districtLayer;
+            else if (layerName === "ac") targetLayer = assemblyLayer;
+            else if (layerName === "pc") targetLayer = parliamentLayer;
+            else if (layerName === "od") targetLayer = odLayer;
+            
+            if (targetLayer) {
+                map.addLayer(targetLayer);
+                renderCasteChoropleth(layerName, targetLayer);
+                map.fitBounds(targetLayer.getBounds(), { padding: [30, 30] });
+            }
+        }
+
+        // Hook Leaflet Overlay Control Adds in Caste Mode
+        map.on('overlayadd', function (e) {
+            if (currentMode === 'caste') {
+                let newLayerName = null;
+                if (e.layer === districtLayer) newLayerName = 'district';
+                else if (e.layer === assemblyLayer) newLayerName = 'ac';
+                else if (e.layer === parliamentLayer) newLayerName = 'pc';
+                else if (e.layer === odLayer) newLayerName = 'od';
+                
+                if (newLayerName && newLayerName !== activeCasteLayer) {
+                    setActiveCasteLayer(newLayerName);
+                }
+            }
+        });
+
+        // Caste Data Lookup and Parsing Functions
+        function getCasteDataForFeature(layerName, feature) {
+            if (layerName === 'district' || layerName === 'od') {
+                // For OD (Organizational Districts) we try to match by name to district data
+                let distName = feature.properties.Dist_Name || feature.properties.dist_name || feature.properties.name || "";
+                // Normalize GeoJSON names to match caste data keys
+                const distNameMap = {
+                    'Muktsar': 'Mukatsar',
+                    'Rupnagar': 'Rup Nagar',
+                    'Sahibzada Ajit Singh Nagar': 'S.A.S. Nagar',
+                    'Shahid Bhagat Singh Nagar': 'Nawanshahr'
+                };
+                if (distNameMap[distName]) distName = distNameMap[distName];
+                if (districtCasteData[distName]) return districtCasteData[distName];
+                // Try fuzzy match for OD names
+                const cleanDist = distName.replace(/\./g, '').replace(/\s+/g, ' ').trim().toUpperCase();
+                for (const k in districtCasteData) {
+                    const cleanK = k.replace(/\./g, '').replace(/\s+/g, ' ').trim().toUpperCase();
+                    if (cleanK === cleanDist || cleanK.includes(cleanDist) || cleanDist.includes(cleanK)) {
+                        return districtCasteData[k];
+                    }
+                }
+                return null;
+            } else if (layerName === 'ac' || layerName === 'pc') {
+                // For PC (Parliamentary Constituencies) we try to match to AC data by name
+                const rawName = feature.properties.AC_NAME || feature.properties.ac_name || 
+                                feature.properties.PC_NAME || feature.properties.pc_name || "";
+                // Direct match first
+                if (acCasteData[rawName]) return acCasteData[rawName];
+                // Normalize function for name comparison
+                function normalizeAcName(s) {
+                    return s.replace(/^\d+\.\s*/, '')           // strip leading "71. "
+                            .replace(/\s*\(SC\)\s*$/i, '')     // strip full (SC)
+                            .replace(/\s*\(SC?\s*$/i, '')      // strip truncated (SC or (S
+                            .replace(/\./g, '')                 // remove dots
+                            .replace(/\s+/g, ' ')              // collapse whitespace
+                            .trim().toUpperCase();
+                }
+                const cleanName = normalizeAcName(rawName);
+                // Try fuzzy match
+                for (const k in acCasteData) {
+                    const cleanK = normalizeAcName(k);
+                    if (cleanK === cleanName || cleanK.includes(cleanName) || cleanName.includes(cleanK)) {
+                        return acCasteData[k];
+                    }
+                }
+                // For PC: try matching against district data as a fallback
+                if (layerName === 'pc') {
+                    const pcName = rawName;
+                    const cleanPC = pcName.replace(/\./g, '').replace(/\s+/g, ' ').trim().toUpperCase();
+                    for (const k in districtCasteData) {
+                        const cleanK = k.replace(/\./g, '').replace(/\s+/g, ' ').trim().toUpperCase();
+                        if (cleanK === cleanPC || cleanK.includes(cleanPC) || cleanPC.includes(cleanK)) {
+                            return districtCasteData[k];
+                        }
+                    }
+                }
+                return null;
+            }
+            return null;
+        }
+
+        function getCastePercentage(layerName, feature, casteName) {
+            const data = getCasteDataForFeature(layerName, feature);
+            if (!data) return 0.0;
+            
+            if (casteName === '__ALL__') {
+                // Return total percentage for active category filter (default is SC if filter is ALL)
+                const activeCat = activeCategoryFilter === 'ALL' ? 'SC' : activeCategoryFilter;
+                return (data.categories && data.categories[activeCat]) || 0.0;
+            }
+            // Find specific caste
+            if (data.castes) {
+                const found = data.castes.find(c => c.name === casteName);
+                return found ? found.percentage : 0.0;
+            }
+            return 0.0;
+        }
+
+        function getCategoryPercentage(layerName, feature, catName) {
+            const data = getCasteDataForFeature(layerName, feature);
+            if (!data || !data.categories) return 0.0;
+            return data.categories[catName] || 0.0;
+        }
+
+        function renderCasteChoropleth(layerName, layer) {
+            const values = [];
+            layer.eachLayer(l => {
+                const pct = getCastePercentage(layerName, l.feature, selectedCaste);
+                values.push(pct);
+            });
+            
+            const maxVal = Math.max(...values, 0.1);
+            const minVal = Math.min(...values, 0.0);
+            
+            const displayLabel = selectedCaste === '__ALL__' ? 
+                (activeCategoryFilter === 'ALL' ? 'SC Population' : `${activeCategoryFilter} Category Total`) : 
+                selectedCaste;
+
+            // Determine boundary color per layer type
+            const layerBorderColors = { district: '#0d9488', ac: '#be123c', pc: '#4338ca', od: '#d97706' };
+            const borderColor = layerBorderColors[layerName] || '#475569';
+            
+            layer.eachLayer(l => {
+                const pct = getCastePercentage(layerName, l.feature, selectedCaste);
+                
+                // NO fill - only border outlines, just like election results mode
+                l.setStyle({
+                    fill: true,
+                    fillOpacity: 0,
+                    weight: layerName === 'ac' ? 1.5 : 2,
+                    color: borderColor,
+                    opacity: 0.85
+                });
+                
+                const fName = getFeatureName(layerName, l.feature);
+                // Build tooltip with category summary
+                const data = getCasteDataForFeature(layerName, l.feature);
+                let catSummary = '';
+                if (data && data.categories) {
+                    const cats = ['GEN', 'OBC', 'SC', 'MIN', 'Others'];
+                    const catColors = { GEN: '#16a34a', OBC: '#ea580c', SC: '#2563eb', MIN: '#9333ea', Others: '#475569' };
+                    catSummary = cats.map(c => {
+                        const v = data.categories[c] || 0;
+                        return v > 0 ? `<span style="color:${catColors[c]}; font-weight:700;">${c}: ${v.toFixed(1)}%</span>` : '';
+                    }).filter(Boolean).join(' · ');
+                }
+                const tooltipContent = `
+                    <div style="font-family:'Outfit',sans-serif; padding:4px 6px;">
+                        <div style="font-weight:700; font-size:12px; color:${borderColor};">${fName}</div>
+                        <div style="font-size:10px; color:#475569; margin-top:3px;">
+                            ${displayLabel}: <strong>${pct.toFixed(2)}%</strong>
+                        </div>
+                        <div style="font-size:9px; margin-top:4px; line-height:1.5;">${catSummary}</div>
+                    </div>
+                `;
+                l.bindTooltip(tooltipContent, { sticky: true, className: 'ulb-hover-tooltip' });
+                
+                l.off('click');
+                l.on('click', function() {
+                    selectCasteFeature(layerName, l.feature, l);
+                });
+            });
+            
+            renderCasteSidebar(layerName, layer, minVal, maxVal);
+            updateCasteLegend(minVal, maxVal);
+            
+            // Show boundary name labels if Clean View is active
+            updateBoundaryLabelsIfNeeded();
+        }
+
+        function getFeatureName(layerName, feature) {
+            const props = feature.properties;
+            if (layerName === 'district') {
+                return props.Dist_Name || props.dist_name || props.name || "Unknown";
+            } else if (layerName === 'ac') {
+                return props.AC_NAME || props.ac_name || "Unknown";
+            } else if (layerName === 'pc') {
+                return props.PC_NAME || props.pc_name || "Unknown";
+            } else if (layerName === 'od') {
+                return props.name || "Unknown";
+            }
+            return "Unknown";
+        }
+
+        // Utility function for sanitizing names into DOM-safe IDs
+        function cleanNameForMatching(name) {
+            return (name || '').replace(/[^a-zA-Z0-9]/g, '_');
+        }
+
+        function getColorForPercentage(val, minVal, maxVal) {
+            if (val === 0) return "#f1f5f9";
+            const range = maxVal - minVal || 1.0;
+            const factor = Math.min(Math.max((val - minVal) / range, 0), 1);
+            const lightness = 92 - (factor * 57);
+            return `hsl(262, 70%, ${lightness}%)`;
+        }
+
+        function updateCasteLegend(minVal, maxVal) {
+            const legendDiv = document.querySelector('.map-legend');
+            if (!legendDiv) return;
+            
+            const displayLabel = selectedCaste === '__ALL__' ? 
+                (activeCategoryFilter === 'ALL' ? 'SC Population' : `${activeCategoryFilter} Category Total`) : 
+                selectedCaste;
+            const step = (maxVal - minVal) / 5;
+            legendDiv.innerHTML = `<div class="legend-title">${displayLabel} %</div>`;
+            
+            for (let i = 0; i < 6; i++) {
+                const val = minVal + i * step;
+                const color = getColorForPercentage(val, minVal, maxVal);
+                legendDiv.innerHTML += `
+                    <div class="legend-row">
+                        <div class="legend-color" style="background: ${color}"></div>
+                        <span>${val.toFixed(1)}%</span>
+                    </div>
+                `;
+            }
+        }
+
+        function updateLegend() {
+            if (currentMode === 'caste') {
+                let activeLayerObj = null;
+                if (activeCasteLayer === 'district') activeLayerObj = districtLayer;
+                else if (activeCasteLayer === 'ac') activeLayerObj = assemblyLayer;
+                else if (activeCasteLayer === 'pc') activeLayerObj = parliamentLayer;
+                else if (activeCasteLayer === 'od') activeLayerObj = odLayer;
+                
+                if (activeLayerObj) {
+                    const values = [];
+                    activeLayerObj.eachLayer(l => {
+                        const pct = getCastePercentage(activeCasteLayer, l.feature, selectedCaste);
+                        values.push(pct);
+                    });
+                    const maxVal = Math.max(...values, 0.1);
+                    const minVal = Math.min(...values, 0.0);
+                    updateCasteLegend(minVal, maxVal);
+                }
+            } else {
+                const legendDiv = document.querySelector('.map-legend');
+                if (legendDiv) {
+                    legendDiv.innerHTML = `
+                        <div class="legend-title">Party Legend</div>
+                        <div class="legend-row"><div class="legend-color" style="background: #0288d1"></div><span>AAP</span></div>
+                        <div class="legend-row"><div class="legend-color" style="background: #2e7d32"></div><span>INC</span></div>
+                        <div class="legend-row"><div class="legend-color" style="background: #f57c00"></div><span>SAD</span></div>
+                        <div class="legend-row"><div class="legend-color" style="background: #e65100"></div><span>BJP</span></div>
+                        <div class="legend-row"><div class="legend-color" style="background: #546e7a"></div><span>Independent</span></div>
+                        <div class="legend-row"><div class="legend-color" style="background: #1a237e"></div><span>BSP</span></div>
+                        <div class="legend-row"><div class="legend-color" style="background: #757575"></div><span>Tie / Coalition</span></div>
+                    `;
+                }
+            }
+        }
+
+        function renderCasteSidebar(layerName, layer, minVal, maxVal) {
+            const listContainer = document.getElementById("item-list");
+            listContainer.innerHTML = "";
+            
+            const displayLabel = selectedCaste === '__ALL__' ? 
+                (activeCategoryFilter === 'ALL' ? 'SC Population' : `${activeCategoryFilter} Category Total`) : 
+                selectedCaste;
+            const catColors = { GEN: '#16a34a', OBC: '#ea580c', SC: '#2563eb', MIN: '#9333ea', Others: '#475569' };
+            
+            const items = [];
+            layer.eachLayer(l => {
+                const name = getFeatureName(layerName, l.feature);
+                const pct = getCastePercentage(layerName, l.feature, selectedCaste);
+                const data = getCasteDataForFeature(layerName, l.feature);
+                items.push({ name, pct, layerObj: l, feature: l.feature, data });
+            });
+            
+            items.sort((a, b) => b.pct - a.pct);
+            
+            const sumPct = items.reduce((acc, curr) => acc + curr.pct, 0);
+            const avgPct = items.length ? (sumPct / items.length) : 0.0;
+            
+            document.getElementById("stat-primary").innerText = avgPct.toFixed(2) + "%";
+            document.getElementById("stat-primary-lbl").innerText = `Avg ${displayLabel}`;
+            
+            if (items.length > 0) {
+                document.getElementById("stat-secondary").innerText = items[0].name;
+                document.getElementById("stat-secondary-lbl").innerText = `Highest (${items[0].pct.toFixed(1)}%)`;
+            } else {
+                document.getElementById("stat-secondary").innerText = "N/A";
+                document.getElementById("stat-secondary-lbl").innerText = "Highest";
+            }
+            
+            document.getElementById("list-count").innerText = items.length;
+            const layerTitleMap = {
+                'district': 'Districts',
+                'ac': 'Assembly Constituencies',
+                'pc': 'Parliamentary Constituencies',
+                'od': 'Organizational Districts'
+            };
+            document.getElementById("list-title-label").innerText = layerTitleMap[layerName] || 'Regions';
+            
+            items.forEach(item => {
+                const itemDiv = document.createElement("div");
+                itemDiv.className = "list-item";
+                itemDiv.id = `caste-item-${(item.name || '').replace(/[^a-zA-Z0-9]/g, '_')}`;
+                
+                // Build category bar (stacked horizontal bar showing GEN/OBC/SC/MIN/Others)
+                let stackedBarHtml = '';
+                if (item.data && item.data.categories) {
+                    const cats = ['GEN', 'OBC', 'SC', 'MIN', 'Others'];
+                    stackedBarHtml = '<div style="display:flex; height:6px; border-radius:3px; overflow:hidden; margin-top:6px;">';
+                    cats.forEach(cat => {
+                        const v = item.data.categories[cat] || 0;
+                        if (v > 0.5) {
+                            stackedBarHtml += `<div style="width:${v}%; background:${catColors[cat]};" title="${cat}: ${v.toFixed(1)}%"></div>`;
+                        }
+                    });
+                    stackedBarHtml += '</div>';
+                    
+                    // Category labels
+                    stackedBarHtml += '<div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:4px;">';
+                    cats.forEach(cat => {
+                        const v = item.data.categories[cat] || 0;
+                        if (v > 0.5) {
+                            stackedBarHtml += `<span style="font-size:9px; font-weight:700; color:${catColors[cat]};">${cat}: ${v.toFixed(1)}%</span>`;
+                        }
+                    });
+                    stackedBarHtml += '</div>';
+                }
+                
+                itemDiv.innerHTML = `
+                    <div class="item-header">
+                        <span class="item-name">${item.name}</span>
+                        <span class="party-badge" style="background: rgba(99, 102, 241, 0.1); color: #4f46e5; border: 1px solid rgba(99, 102, 241, 0.2)">
+                            ${displayLabel}: ${item.pct.toFixed(1)}%
+                        </span>
+                    </div>
+                    ${stackedBarHtml}
+                `;
+                
+                itemDiv.addEventListener("click", () => {
+                    map.fitBounds(item.layerObj.getBounds(), { padding: [50, 50] });
+                    selectCasteFeature(layerName, item.feature, item.layerObj);
+                });
+                
+                listContainer.appendChild(itemDiv);
+            });
+        }
+
+        let currentPopupLayerName = null;
+        let currentPopupFeature = null;
+        let currentPopupLayer = null;
+        let activePopupFilterCategory = "ALL";
+
+        function filterPopupCategory(cat, event) {
+            if (event) {
+                event.stopPropagation();
+                event.preventDefault();
+            }
+            if (activePopupFilterCategory === cat && cat !== "ALL") {
+                activePopupFilterCategory = "ALL";
+            } else {
+                activePopupFilterCategory = cat;
+            }
+            
+            if (currentPopupLayer && currentPopupLayer.getPopup()) {
+                const newContent = buildPopupContent();
+                currentPopupLayer.setPopupContent(newContent);
+            }
+        }
+
+        function buildPopupContent() {
+            if (!currentPopupFeature) return "";
+            
+            const layerName = currentPopupLayerName;
+            const feature = currentPopupFeature;
+            const name = getFeatureName(layerName, feature);
+            const data = getCasteDataForFeature(layerName, feature);
+            const catColors = { GEN: '#16a34a', OBC: '#ea580c', SC: '#2563eb', MIN: '#9333ea', Others: '#475569' };
+            const catLabels = { GEN: 'General', OBC: 'OBC', SC: 'Scheduled Caste', MIN: 'Minorities', Others: 'Others' };
+            let breakdownHtml = "";
+            
+            if (data && data.castes) {
+                // Category summary at top
+                let catHtml = '<div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px; border-bottom: 1px solid var(--border-light); padding-bottom: 8px;">';
+                
+                // Add an "ALL" badge
+                const allActive = activePopupFilterCategory === "ALL";
+                catHtml += `
+                    <span onclick="filterPopupCategory('ALL', event)" 
+                          style="font-size:9px; font-weight:800; cursor:pointer; color:${allActive ? '#ffffff' : '#64748b'}; background:${allActive ? '#64748b' : '#64748b15'}; padding:3px 6px; border-radius:4px; border:1px solid ${allActive ? '#64748b' : '#64748b30'}; transition: all 0.2s;"
+                          title="Show all castes">
+                        ALL
+                    </span>
+                `;
+
+                ['GEN', 'OBC', 'SC', 'MIN', 'Others'].forEach(cat => {
+                    const v = (data.categories && data.categories[cat]) || 0;
+                    if (v > 0.01) {
+                        const isActive = activePopupFilterCategory === cat;
+                        const bgColor = isActive ? catColors[cat] : `${catColors[cat]}15`;
+                        const textColor = isActive ? '#ffffff' : catColors[cat];
+                        const borderStyle = isActive ? `1px solid ${catColors[cat]}` : `1px solid ${catColors[cat]}30`;
+                        
+                        catHtml += `
+                            <span onclick="filterPopupCategory('${cat}', event)" 
+                                  style="font-size:9px; font-weight:800; cursor:pointer; color:${textColor}; background:${bgColor}; padding:3px 6px; border-radius:4px; border:${borderStyle}; transition: all 0.2s; display:inline-flex; align-items:center; gap:2px;"
+                                  title="Click to show only ${catLabels[cat]} castes">
+                                ${cat}: ${v.toFixed(1)}%
+                            </span>
+                        `;
+                    }
+                });
+                catHtml += '</div>';
+                
+                // Filter and sort castes
+                let casteList = data.castes.filter(c => c.percentage > 0.01);
+                if (activePopupFilterCategory !== "ALL") {
+                    casteList = casteList.filter(c => c.category === activePopupFilterCategory);
+                }
+                casteList.sort((a, b) => b.percentage - a.percentage);
+                
+                let listHtml = "";
+                if (casteList.length > 0) {
+                    listHtml = casteList.map(item => {
+                        const barColor = catColors[item.category] || '#475569';
+                        return `
+                            <div class="caste-breakdown-row" style="margin-bottom: 6px; display: flex; flex-direction: column; gap: 2px;">
+                                <div class="caste-breakdown-labels" style="display: flex; justify-content: space-between; font-size: 11px; font-weight: 600;">
+                                    <span>
+                                        ${item.name} 
+                                        <span style="color:var(--text-muted);font-size:9px;">(${item.category})</span>
+                                    </span>
+                                    <span style="font-weight:800;">${item.percentage.toFixed(2)}%</span>
+                                </div>
+                                <div class="caste-breakdown-bar-bg" style="background: #e2e8f0; height: 6px; border-radius: 3px; overflow: hidden; width: 100%;">
+                                    <div class="caste-breakdown-bar" style="width: ${Math.min(item.percentage, 100)}%; background: ${barColor}; height: 100%; border-radius: 3px;"></div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                } else {
+                    listHtml = `<div style="font-size: 11px; color: var(--text-muted); padding: 10px 0; text-align: center;">No castes in this category with >0.01% representation.</div>`;
+                }
+                
+                breakdownHtml = catHtml + `
+                    <div class="caste-breakdown-container" style="max-height:200px; overflow-y:auto; padding-right:4px;">
+                        ${listHtml}
+                    </div>
+                `;
+            } else {
+                breakdownHtml = `<div style="font-size: 11px; color: var(--text-muted); margin-top: 6px;">No detailed caste breakdown available.</div>`;
+            }
+            
+            return `
+                <div class="popup-header-box" style="margin-bottom: 6px;">
+                    <span class="popup-title-text" style="font-size: 14px;">${name}</span>
+                </div>
+                <div style="font-size: 9px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-top: 6px; margin-bottom: 6px; letter-spacing: 0.5px;">
+                    Caste Breakdown ${activePopupFilterCategory !== "ALL" ? `(${activePopupFilterCategory} only)` : ""}
+                </div>
+                ${breakdownHtml}
+            `;
+        }
+
+        function selectCasteFeature(layerName, feature, layerObj) {
+            document.querySelectorAll(".list-item").forEach(el => el.classList.remove("active"));
+            const name = getFeatureName(layerName, feature);
+            const cleanId = `caste-item-${(name || '').replace(/[^a-zA-Z0-9]/g, '_')}`;
+            const itemEl = document.getElementById(cleanId);
+            if (itemEl) {
+                itemEl.classList.add("active");
+                itemEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+            
+            currentPopupLayerName = layerName;
+            currentPopupFeature = feature;
+            currentPopupLayer = layerObj;
+            activePopupFilterCategory = "ALL";
+            
+            const popupContent = buildPopupContent();
+            
+            layerObj.bindPopup(popupContent, { closeButton: false, minWidth: 280, maxHeight: 400 }).openPopup();
+        }
+
+        function handleCasteSelectChange(val) {
+            selectedCaste = val;
+            setActiveCasteLayer(activeCasteLayer);
+        }
 
         // Party Style & Code Mapping
         const partyColors = {
@@ -927,6 +2124,7 @@
             }
 
             ulbLayer = L.geoJSON(electionUlbsData, {
+                pane: 'localBodyPane',
                 style: styleUlbFeature,
                 onEachFeature: function (feature, layer) {
                     // Bind hover tooltip displaying "Name - Type"
@@ -1113,6 +2311,7 @@
 
             // Add Ward Layer to map
             wardLayer = L.geoJSON(cityWards, {
+                pane: 'localBodyPane',
                 style: styleWardFeature,
                 onEachFeature: function (feature, layer) {
                     layer.on({
@@ -1208,6 +2407,61 @@
             const query = e.target.value.toLowerCase().trim();
             const listContainer = document.getElementById("item-list");
             
+            if (currentMode === "caste") {
+                let activeLayer = null;
+                if (activeCasteLayer === 'district') activeLayer = districtLayer;
+                else if (activeCasteLayer === 'ac') activeLayer = assemblyLayer;
+                else if (activeCasteLayer === 'pc') activeLayer = parliamentLayer;
+                else if (activeCasteLayer === 'od') activeLayer = odLayer;
+                
+                if (!activeLayer) return;
+                
+                const items = [];
+                activeLayer.eachLayer(l => {
+                    const name = getFeatureName(activeCasteLayer, l.feature);
+                    const pct = getCastePercentage(activeCasteLayer, l.feature, selectedCaste);
+                    items.push({ name, pct, layerObj: l, feature: l.feature });
+                });
+                
+                const filtered = items.filter(item => item.name.toLowerCase().includes(query));
+                filtered.sort((a, b) => b.pct - a.pct);
+                
+                document.getElementById("list-count").innerText = filtered.length;
+                listContainer.innerHTML = "";
+                
+                if (filtered.length === 0) {
+                    listContainer.innerHTML = `<div class="empty-state"><i class="fa-solid fa-map-location-dot"></i>No regions match search.</div>`;
+                    return;
+                }
+                
+                filtered.forEach(item => {
+                    const itemDiv = document.createElement("div");
+                    itemDiv.className = "list-item";
+                    itemDiv.id = `caste-item-${cleanNameForMatching(item.name)}`;
+                    
+                    const progressWidth = Math.min(item.pct, 100);
+                    itemDiv.innerHTML = `
+                        <div class="item-header">
+                            <span class="item-name">${item.name}</span>
+                            <span class="party-badge" style="background: rgba(99, 102, 241, 0.1); color: #4f46e5; border: 1px solid rgba(99, 102, 241, 0.2)">
+                                ${item.pct.toFixed(2)}%
+                            </span>
+                        </div>
+                        <div class="caste-breakdown-bar-bg" style="margin-top: 4px;">
+                            <div class="caste-breakdown-bar" style="width: ${progressWidth}%; background: linear-gradient(90deg, #818cf8, #4f46e5)"></div>
+                        </div>
+                    `;
+                    
+                    itemDiv.addEventListener("click", () => {
+                        map.fitBounds(item.layerObj.getBounds(), { padding: [50, 50] });
+                        selectCasteFeature(activeCasteLayer, item.feature, item.layerObj);
+                    });
+                    
+                    listContainer.appendChild(itemDiv);
+                });
+                return;
+            }
+            
             if (currentView === "state") {
                 // Filter cities
                 let features = [...electionUlbsData.features];
@@ -1302,6 +2556,61 @@
             wardLabels.forEach(label => map.removeLayer(label));
             wardLabels = [];
         }
+
+        // ==========================================
+        // BOUNDARY NAME LABELS (Clean View + Caste Mode)
+        // ==========================================
+        let boundaryNameLabels = [];
+        let currentBaseMap = 'street'; // Track which base map is active
+
+        function clearBoundaryNameLabels() {
+            boundaryNameLabels.forEach(label => map.removeLayer(label));
+            boundaryNameLabels = [];
+        }
+
+        function addBoundaryNameLabels(layerName, layer) {
+            clearBoundaryNameLabels();
+            layer.eachLayer(l => {
+                const name = getFeatureName(layerName, l.feature);
+                if (!name || name === 'Unknown') return;
+                const center = l.getBounds().getCenter();
+                const label = L.tooltip({
+                    permanent: true,
+                    direction: 'center',
+                    className: 'boundary-name-label'
+                });
+                label.setContent(name);
+                label.setLatLng(center);
+                label.addTo(map);
+                boundaryNameLabels.push(label);
+            });
+        }
+
+        function updateBoundaryLabelsIfNeeded() {
+            // Show labels only when: caste mode + clean view base map
+            if (currentMode === 'caste' && currentBaseMap === 'clean') {
+                let activeLayer = null;
+                if (activeCasteLayer === 'district') activeLayer = districtLayer;
+                else if (activeCasteLayer === 'ac') activeLayer = assemblyLayer;
+                else if (activeCasteLayer === 'pc') activeLayer = parliamentLayer;
+                else if (activeCasteLayer === 'od') activeLayer = odLayer;
+                if (activeLayer) {
+                    addBoundaryNameLabels(activeCasteLayer, activeLayer);
+                }
+            } else {
+                clearBoundaryNameLabels();
+            }
+        }
+
+        // Listen for base map changes
+        map.on('baselayerchange', function(e) {
+            if (e.layer === cleanLayer) {
+                currentBaseMap = 'clean';
+            } else {
+                currentBaseMap = 'street';
+            }
+            updateBoundaryLabelsIfNeeded();
+        });
 
         // ==========================================
         // 4. FLOATING MAP LEGEND (always shows all parties)
@@ -1403,6 +2712,34 @@
             return result;
         }
 
+        function hslStringToRgb(hslStr) {
+            const m = hslStr.match(/hsl\(\s*(\d+)\s*,\s*(\d+)%\s*,\s*([\d\.]+)%\s*\)/);
+            if (!m) return [255, 255, 255];
+            const h = parseInt(m[1]) / 360;
+            const s = parseInt(m[2]) / 100;
+            const l = parseFloat(m[3]) / 100;
+            
+            let r, g, b;
+            if (s === 0) {
+                r = g = b = l;
+            } else {
+                const hue2rgb = (p, q, t) => {
+                    if (t < 0) t += 1;
+                    if (t > 1) t -= 1;
+                    if (t < 1/6) return p + (q - p) * 6 * t;
+                    if (t < 1/2) return q;
+                    if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+                    return p;
+                };
+                const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+                const p = 2 * l - q;
+                r = hue2rgb(p, q, h + 1/3);
+                g = hue2rgb(p, q, h);
+                b = hue2rgb(p, q, h - 1/3);
+            }
+            return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+        }
+
         async function downloadPDF() {
             const btn = document.getElementById('download-pdf-btn');
             const originalText = btn.innerHTML;
@@ -1418,7 +2755,8 @@
                     '.leaflet-control-zoom',
                     '.leaflet-control-attribution',
                     '.map-legend',
-                    '#city-header-overlay'
+                    '#city-header-overlay',
+                    '.mode-selector-container'
                 ];
                 const hiddenEls = [];
                 hideSelectors.forEach(sel => {
@@ -1461,12 +2799,12 @@
 
                 // Draw a beautiful floating glassmorphic header card at the top center
                 const typeLabel = currentView === 'city' ? getLocalBodyTypeLabel(selectedCityFeature.properties.code) : '';
-                const cityNameText = currentView === 'city' 
-                    ? `${selectedCityFeature.properties.name} - ${typeLabel}`
-                    : 'PUNJAB STATE';
+                const cityNameText = currentMode === 'caste'
+                    ? 'PUNJAB CASTE MAP'
+                    : (currentView === 'city' ? `${selectedCityFeature.properties.name} - ${typeLabel}` : 'PUNJAB STATE');
                 
                 // Dynamically adjust header card width based on text length to prevent overflow
-                const headerWidth = currentView === 'city' ? 360 : 260;
+                const headerWidth = currentMode === 'caste' ? 260 : (currentView === 'city' ? 360 : 260);
                 const headerHeight = 65;
                 const headerX = (mapImgWidth - headerWidth) / 2;
                 const headerY = 25;
@@ -1493,15 +2831,50 @@
                 pdf.setFont('helvetica', 'normal');
                 pdf.setFontSize(10);
                 pdf.setTextColor(100, 116, 139); // slate-500
-                const subtitle = currentView === 'city' ? 'WARD ELECTION RESULTS' : 'CIVIC ELECTION RESULTS 2026';
+                const subtitle = currentMode === 'caste'
+                    ? `${selectedCaste.toUpperCase()} DISTRIBUTION`
+                    : (currentView === 'city' ? 'WARD ELECTION RESULTS' : 'CIVIC ELECTION RESULTS 2026');
                 pdf.text(subtitle, mapImgWidth / 2, headerY + 48, { align: 'center' });
 
                 // Draw the legend box at top-right
-                const activeParties = getActivePartiesForPDF();
                 const legendPadding = 14;
                 const rowHeight = 22;
                 const legendBoxWidth = 210;
-                const legendBoxHeight = 35 + activeParties.length * rowHeight;
+                
+                let activeParties = [];
+                let casteLegendSteps = [];
+                let legendBoxHeight = 0;
+                
+                if (currentMode === 'caste') {
+                    let activeLayerObj = null;
+                    if (activeCasteLayer === 'district') activeLayerObj = districtLayer;
+                    else if (activeCasteLayer === 'ac') activeLayerObj = assemblyLayer;
+                    else if (activeCasteLayer === 'pc') activeLayerObj = parliamentLayer;
+                    else if (activeCasteLayer === 'od') activeLayerObj = odLayer;
+                    
+                    let minVal = 0.0, maxVal = 100.0;
+                    if (activeLayerObj) {
+                        const values = [];
+                        activeLayerObj.eachLayer(l => {
+                            const pct = getCastePercentage(activeCasteLayer, l.feature, selectedCaste);
+                            values.push(pct);
+                        });
+                        maxVal = Math.max(...values, 0.1);
+                        minVal = Math.min(...values, 0.0);
+                    }
+                    
+                    const step = (maxVal - minVal) / 5;
+                    for (let i = 0; i < 6; i++) {
+                        const val = minVal + i * step;
+                        const color = getColorForPercentage(val, minVal, maxVal);
+                        casteLegendSteps.push({ val, color });
+                    }
+                    legendBoxHeight = 35 + casteLegendSteps.length * rowHeight;
+                } else {
+                    activeParties = getActivePartiesForPDF();
+                    legendBoxHeight = 35 + activeParties.length * rowHeight;
+                }
+
                 const legendX = mapImgWidth - legendBoxWidth - 30;
                 const legendY = 25; // Perfectly aligned with the header card at the top
 
@@ -1515,34 +2888,48 @@
                 pdf.setFont('helvetica', 'bold');
                 pdf.setFontSize(9);
                 pdf.setTextColor(100, 116, 139); // slate-500
-                pdf.text('PARTY BREAKDOWN', legendX + legendPadding, legendY + 18);
+                const legendTitleText = currentMode === 'caste' ? `${selectedCaste.toUpperCase()} %` : 'PARTY BREAKDOWN';
+                const truncatedTitle = legendTitleText.length > 25 ? legendTitleText.substring(0, 22) + '...' : legendTitleText;
+                pdf.text(truncatedTitle, legendX + legendPadding, legendY + 18);
 
                 // Divider line
                 pdf.setDrawColor(241, 245, 249); // slate-100
                 pdf.line(legendX + legendPadding, legendY + 24, legendX + legendBoxWidth - legendPadding, legendY + 24);
 
-                // Party rows
-                activeParties.forEach((party, i) => {
-                    const y = legendY + 38 + i * rowHeight;
-                    // Color swatch
-                    const hex = party.hex;
-                    const r = parseInt(hex.slice(1,3), 16);
-                    const g = parseInt(hex.slice(3,5), 16);
-                    const b = parseInt(hex.slice(5,7), 16);
-                    pdf.setFillColor(r, g, b);
-                    pdf.roundedRect(legendX + legendPadding, y - 9, 12, 12, 2, 2, 'F');
-                    
-                    // Label with total wards won
-                    pdf.setFont('helvetica', 'normal');
-                    pdf.setFontSize(10);
-                    pdf.setTextColor(15, 23, 42); // slate-900
-                    const labelText = `${party.label} — ${party.wins} ${party.wins === 1 ? 'Ward' : 'Wards'}`;
-                    pdf.text(labelText, legendX + legendPadding + 18, y + 1);
-                });
+                // Draw rows
+                if (currentMode === 'caste') {
+                    casteLegendSteps.forEach((step, i) => {
+                        const y = legendY + 38 + i * rowHeight;
+                        const rgb = hslStringToRgb(step.color);
+                        pdf.setFillColor(rgb[0], rgb[1], rgb[2]);
+                        pdf.roundedRect(legendX + legendPadding, y - 9, 12, 12, 2, 2, 'F');
+                        
+                        pdf.setFont('helvetica', 'normal');
+                        pdf.setFontSize(10);
+                        pdf.setTextColor(15, 23, 42); // slate-900
+                        pdf.text(`${step.val.toFixed(1)}%`, legendX + legendPadding + 18, y + 1);
+                    });
+                } else {
+                    activeParties.forEach((party, i) => {
+                        const y = legendY + 38 + i * rowHeight;
+                        const hex = party.hex;
+                        const r = parseInt(hex.slice(1,3), 16);
+                        const g = parseInt(hex.slice(3,5), 16);
+                        const b = parseInt(hex.slice(5,7), 16);
+                        pdf.setFillColor(r, g, b);
+                        pdf.roundedRect(legendX + legendPadding, y - 9, 12, 12, 2, 2, 'F');
+                        
+                        pdf.setFont('helvetica', 'normal');
+                        pdf.setFontSize(10);
+                        pdf.setTextColor(15, 23, 42); // slate-900
+                        const labelText = `${party.label} — ${party.wins} ${party.wins === 1 ? 'Ward' : 'Wards'}`;
+                        pdf.text(labelText, legendX + legendPadding + 18, y + 1);
+                    });
+                }
 
-                const fileName = currentView === 'city'
-                    ? `Punjab_Election_${selectedCityName}_Wards.pdf`
-                    : 'Punjab_Civic_Elections_2026_Map.pdf';
+                const fileName = currentMode === 'caste'
+                    ? `Punjab_Caste_Map_${selectedCaste.replace(/\s+/g, '_')}.pdf`
+                    : (currentView === 'city' ? `Punjab_Election_${selectedCityName}_Wards.pdf` : 'Punjab_Civic_Elections_2026_Map.pdf');
 
                 pdf.save(fileName);
             } catch (err) {

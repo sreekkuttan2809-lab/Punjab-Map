@@ -653,6 +653,44 @@
             display: none !important;
         }
 
+        /* Toggle Names Button (Clean View + Caste mode) */
+        #toggle-names-btn {
+            display: none;
+            position: absolute;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(15, 23, 42, 0.1);
+            border-radius: 10px;
+            padding: 8px 18px;
+            font-family: 'Outfit', sans-serif;
+            font-size: 12px;
+            font-weight: 600;
+            color: #334155;
+            cursor: pointer;
+            box-shadow: 0 4px 16px rgba(15, 23, 42, 0.08);
+            transition: all 0.2s ease;
+            gap: 6px;
+            align-items: center;
+        }
+        #toggle-names-btn:hover {
+            background: rgba(255, 255, 255, 1);
+            box-shadow: 0 6px 20px rgba(15, 23, 42, 0.12);
+            transform: translateX(-50%) translateY(-1px);
+        }
+        #toggle-names-btn.active {
+            background: #1e293b;
+            color: #f8fafc;
+            border-color: #1e293b;
+        }
+        #toggle-names-btn.active:hover {
+            background: #334155;
+        }
+
         /* ULB Hover Tooltip styling */
         .ulb-hover-tooltip {
             background: rgba(255, 255, 255, 0.98) !important;
@@ -982,6 +1020,11 @@
             <div id="city-header-overlay" class="city-header-overlay" style="display:none;">
                 <div id="city-header-name" class="city-header-name"></div>
             </div>
+
+            <!-- Toggle Names Button (only visible in Clean View + Caste mode) -->
+            <button id="toggle-names-btn" onclick="toggleBoundaryNames()">
+                <i class="fa-solid fa-font"></i> Show Names
+            </button>
         </div>
         
     </div>
@@ -2586,9 +2629,43 @@
             });
         }
 
+        let boundaryLabelsVisible = false; // Labels hidden by default
+
         function updateBoundaryLabelsIfNeeded() {
-            // Show labels only when: caste mode + clean view base map
+            const btn = document.getElementById('toggle-names-btn');
+            // Show/hide the toggle button: only visible in caste mode + clean view
             if (currentMode === 'caste' && currentBaseMap === 'clean') {
+                btn.style.display = 'inline-flex';
+                // If labels are toggled ON, refresh them (e.g. when switching boundary layer)
+                if (boundaryLabelsVisible) {
+                    let activeLayer = null;
+                    if (activeCasteLayer === 'district') activeLayer = districtLayer;
+                    else if (activeCasteLayer === 'ac') activeLayer = assemblyLayer;
+                    else if (activeCasteLayer === 'pc') activeLayer = parliamentLayer;
+                    else if (activeCasteLayer === 'od') activeLayer = odLayer;
+                    if (activeLayer) {
+                        addBoundaryNameLabels(activeCasteLayer, activeLayer);
+                    }
+                } else {
+                    clearBoundaryNameLabels();
+                }
+            } else {
+                btn.style.display = 'none';
+                clearBoundaryNameLabels();
+                // Reset toggle state when leaving clean view
+                boundaryLabelsVisible = false;
+                btn.classList.remove('active');
+                btn.innerHTML = '<i class="fa-solid fa-font"></i> Show Names';
+            }
+        }
+
+        function toggleBoundaryNames() {
+            const btn = document.getElementById('toggle-names-btn');
+            boundaryLabelsVisible = !boundaryLabelsVisible;
+            
+            if (boundaryLabelsVisible) {
+                btn.classList.add('active');
+                btn.innerHTML = '<i class="fa-solid fa-font"></i> Hide Names';
                 let activeLayer = null;
                 if (activeCasteLayer === 'district') activeLayer = districtLayer;
                 else if (activeCasteLayer === 'ac') activeLayer = assemblyLayer;
@@ -2598,6 +2675,8 @@
                     addBoundaryNameLabels(activeCasteLayer, activeLayer);
                 }
             } else {
+                btn.classList.remove('active');
+                btn.innerHTML = '<i class="fa-solid fa-font"></i> Show Names';
                 clearBoundaryNameLabels();
             }
         }

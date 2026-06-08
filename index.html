@@ -1073,23 +1073,23 @@
             attribution: '&copy; CARTO'
         });
 
-        // ESRI Satellite Imagery
-        const satelliteTiles = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-            maxZoom: 19,
-            attribution: '&copy; Esri'
+        // Google Satellite Imagery (pure aerial, no labels)
+        const satelliteTiles = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+            maxZoom: 21,
+            attribution: '&copy; Google'
         });
 
-        // Label Overlay for Satellite Hybrid
-        const labelOverlay = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
-            maxZoom: 20,
-            pane: 'overlayPane'
+        // Google Hybrid Overlay (satellite + full roads, shops, labels, landmarks)
+        const hybridTiles = L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+            maxZoom: 21,
+            attribution: '&copy; Google'
         });
 
         // Clean View - Completely blank canvas showing only vector boundaries
         const cleanLayer = L.layerGroup([]);
 
-        // Satellite + Labels combined group
-        const hybridLayer = L.layerGroup([satelliteTiles, labelOverlay]);
+        // Satellite + Streets combined: use Google Hybrid tiles directly (not a layerGroup)
+        const hybridLayer = hybridTiles;
 
         // Set Default Base Map
         osmStreet.addTo(map);

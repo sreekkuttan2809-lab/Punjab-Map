@@ -1686,7 +1686,7 @@
                 const pct = getCastePercentage(layerName, l.feature, selectedCaste);
                 // Apply fill based on choropleth toggle
                 if (choroplethFillEnabled) {
-                    const color = getColorForPercentage(pct, minVal, maxVal);
+                    const color = getColorForPercentage(pct, 0, 50);
                     l.setStyle({
                         fill: true,
                         fillColor: color,
@@ -1802,14 +1802,21 @@
                     </button>
                 </div>
             `;
+            const fixedRanges = [
+                { label: '0%', val: 0 },
+                { label: '0 – 10%', val: 5 },
+                { label: '10 – 20%', val: 15 },
+                { label: '20 – 30%', val: 25 },
+                { label: '30 – 40%', val: 35 },
+                { label: '40 – 50%', val: 45 }
+            ];
             
-            for (let i = 0; i < 6; i++) {
-                const val = minVal + i * step;
-                const color = getColorForPercentage(val, minVal, maxVal);
+            for (const range of fixedRanges) {
+                const color = getColorForPercentage(range.val, 0, 50);
                 legendDiv.innerHTML += `
                     <div class="legend-row">
                         <div class="legend-color" style="background: ${color}"></div>
-                        <span>${val.toFixed(1)}%</span>
+                        <span>${range.label}</span>
                     </div>
                 `;
             }
@@ -2985,11 +2992,17 @@
                         minVal = Math.min(...values, 0.0);
                     }
                     
-                    const step = (maxVal - minVal) / 5;
-                    for (let i = 0; i < 6; i++) {
-                        const val = minVal + i * step;
-                        const color = getColorForPercentage(val, minVal, maxVal);
-                        casteLegendSteps.push({ val, color });
+                    const fixedRanges = [
+                        { label: '0%', val: 0 },
+                        { label: '0 – 10%', val: 5 },
+                        { label: '10 – 20%', val: 15 },
+                        { label: '20 – 30%', val: 25 },
+                        { label: '30 – 40%', val: 35 },
+                        { label: '40 – 50%', val: 45 }
+                    ];
+                    for (const range of fixedRanges) {
+                        const color = getColorForPercentage(range.val, 0, 50);
+                        casteLegendSteps.push({ val: range.val, color, label: range.label });
                     }
                     legendBoxHeight = 35 + casteLegendSteps.length * rowHeight;
                 } else {
@@ -3029,7 +3042,7 @@
                         pdf.setFont('helvetica', 'normal');
                         pdf.setFontSize(10);
                         pdf.setTextColor(15, 23, 42); // slate-900
-                        pdf.text(`${step.val.toFixed(1)}%`, legendX + legendPadding + 18, y + 1);
+                        pdf.text(step.label || `${step.val.toFixed(1)}%`, legendX + legendPadding + 18, y + 1);
                     });
                 } else {
                     activeParties.forEach((party, i) => {

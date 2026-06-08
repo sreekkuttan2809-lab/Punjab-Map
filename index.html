@@ -1306,6 +1306,7 @@
         let activeCasteLayer = "district"; // "district", "ac"
         let selectedCaste = "__ALL__"; // "__ALL__" for overview, or a specific caste name
         let activeCategoryFilter = "ALL"; // "ALL", "GEN", "OBC", "SC", "MIN", "Others"
+        let choroplethFillEnabled = false; // Whether to show color fill on caste boundaries
 
         function filterCasteDropdown(cat) {
             activeCategoryFilter = cat;
@@ -1683,15 +1684,27 @@
             
             layer.eachLayer(l => {
                 const pct = getCastePercentage(layerName, l.feature, selectedCaste);
-                
-                // NO fill - only border outlines, just like election results mode
-                l.setStyle({
-                    fill: true,
-                    fillOpacity: 0,
-                    weight: layerName === 'ac' ? 1.5 : 2,
-                    color: borderColor,
-                    opacity: 0.85
-                });
+                // Apply fill based on choropleth toggle
+                if (choroplethFillEnabled) {
+                    const color = getColorForPercentage(pct, minVal, maxVal);
+                    l.setStyle({
+                        fill: true,
+                        fillColor: color,
+                        fillOpacity: 0.65,
+                        weight: 1.5,
+                        color: '#ffffff',
+                        opacity: 0.9
+                    });
+                } else {
+                    // No fill - only border outlines
+                    l.setStyle({
+                        fill: true,
+                        fillOpacity: 0,
+                        weight: layerName === 'ac' ? 1.5 : 2,
+                        color: borderColor,
+                        opacity: 0.85
+                    });
+                }
                 
                 const fName = getFeatureName(layerName, l.feature);
                 // Build tooltip with category summary
@@ -1764,7 +1777,31 @@
                 (activeCategoryFilter === 'ALL' ? 'SC Population' : `${activeCategoryFilter} Category Total`) : 
                 selectedCaste;
             const step = (maxVal - minVal) / 5;
-            legendDiv.innerHTML = `<div class="legend-title">${displayLabel} %</div>`;
+            
+            // Toggle button styling
+            const btnBg = choroplethFillEnabled ? '#1e293b' : 'rgba(99, 102, 241, 0.1)';
+            const btnColor = choroplethFillEnabled ? '#f8fafc' : '#4f46e5';
+            const btnBorder = choroplethFillEnabled ? '#1e293b' : 'rgba(99, 102, 241, 0.25)';
+            const btnText = choroplethFillEnabled ? 'Hide Colors' : 'Show Colors';
+            const btnIcon = choroplethFillEnabled ? 'fa-eye-slash' : 'fa-palette';
+            
+            legendDiv.innerHTML = `
+                <div class="legend-title">${displayLabel} %</div>
+                <div style="margin: 6px 0 8px 0;">
+                    <button onclick="toggleChoroplethFill()" style="
+                        display: inline-flex; align-items: center; gap: 5px;
+                        background: ${btnBg}; color: ${btnColor};
+                        border: 1px solid ${btnBorder}; border-radius: 6px;
+                        padding: 4px 10px; font-family: 'Outfit', sans-serif;
+                        font-size: 10px; font-weight: 600; cursor: pointer;
+                        transition: all 0.2s ease; width: 100%;
+                        justify-content: center;
+                    ">
+                        <i class="fa-solid ${btnIcon}" style="font-size: 9px;"></i>
+                        ${btnText}
+                    </button>
+                </div>
+            `;
             
             for (let i = 0; i < 6; i++) {
                 const val = minVal + i * step;
@@ -1776,6 +1813,12 @@
                     </div>
                 `;
             }
+        }
+
+        function toggleChoroplethFill() {
+            choroplethFillEnabled = !choroplethFillEnabled;
+            // Re-render the active caste layer to apply/remove fill
+            setActiveCasteLayer(activeCasteLayer);
         }
 
         function updateLegend() {
@@ -2633,8 +2676,8 @@
 
         function updateBoundaryLabelsIfNeeded() {
             const btn = document.getElementById('toggle-names-btn');
-            // Show/hide the toggle button: only visible in caste mode + clean view
-            if (currentMode === 'caste' && currentBaseMap === 'clean') {
+            // Show/hide the toggle button: visible in caste mode on any base map
+            if (currentMode === 'caste') {
                 btn.style.display = 'inline-flex';
                 // If labels are toggled ON, refresh them (e.g. when switching boundary layer)
                 if (boundaryLabelsVisible) {
@@ -2652,7 +2695,7 @@
             } else {
                 btn.style.display = 'none';
                 clearBoundaryNameLabels();
-                // Reset toggle state when leaving clean view
+                // Reset toggle state when leaving caste mode
                 boundaryLabelsVisible = false;
                 btn.classList.remove('active');
                 btn.innerHTML = '<i class="fa-solid fa-font"></i> Show Names';

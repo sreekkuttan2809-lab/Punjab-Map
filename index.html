@@ -631,21 +631,15 @@
 
         /* Boundary name labels for Clean View in caste mode */
         .boundary-name-label {
-            background: transparent !important;
-            border: none !important;
-            box-shadow: none !important;
-            color: #1e293b;
-            font-size: 11px;
+            background: rgba(255, 255, 255, 0.9) !important;
+            border: 1px solid rgba(15, 23, 42, 0.15) !important;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.08) !important;
+            color: #0f172a;
+            font-size: 10px;
             font-weight: 700;
             font-family: 'Outfit', sans-serif;
-            text-shadow: 
-                -1px -1px 0 #fff, 1px -1px 0 #fff,
-                -1px 1px 0 #fff, 1px 1px 0 #fff,
-                0 -1px 0 #fff, 0 1px 0 #fff,
-                -1px 0 0 #fff, 1px 0 0 #fff,
-                0 0 4px rgba(255,255,255,0.9);
-            padding: 0 !important;
-            margin: 0 !important;
+            padding: 2px 6px !important;
+            border-radius: 6px !important;
             white-space: nowrap;
         }
 
@@ -1109,20 +1103,34 @@
         // Dynamic hover highlighting for administrative layers
         function highlightAdminFeature(e, layerName, layerGroup) {
             const layer = e.target;
-            // Both modes: ONLY highlight border, absolutely NO fill
             let highlightColor = '#0f766e';
             if (layerName === 'ac') highlightColor = '#9f1239';
             else if (layerName === 'pc') highlightColor = '#3730a3';
             else if (layerName === 'od') highlightColor = '#b45309';
             
-            layer.setStyle({
-                weight: layerName === 'ac' ? 2.5 : (layerName === 'pc' ? 3.5 : 3),
-                color: highlightColor,
-                opacity: 1,
-                fill: true,
-                fillColor: 'transparent',
-                fillOpacity: 0
-            });
+            if (currentMode === 'caste') {
+                const pct = getCastePercentage(layerName, layer.feature, selectedCaste);
+                const rangeKey = getRangeKeyForPercentage(pct);
+                const isColorHidden = window.hiddenColorsByRange[rangeKey];
+                const fillColor = getColorForPercentage(pct, 0, 50);
+                layer.setStyle({
+                    weight: layerName === 'ac' ? 2.5 : (layerName === 'pc' ? 3.5 : 3),
+                    color: highlightColor,
+                    opacity: 1,
+                    fill: true,
+                    fillColor: (choroplethFillEnabled && !isColorHidden) ? fillColor : 'transparent',
+                    fillOpacity: (choroplethFillEnabled && !isColorHidden) ? 0.8 : 0
+                });
+            } else {
+                layer.setStyle({
+                    weight: layerName === 'ac' ? 2.5 : (layerName === 'pc' ? 3.5 : 3),
+                    color: highlightColor,
+                    opacity: 1,
+                    fill: true,
+                    fillColor: 'transparent',
+                    fillOpacity: 0
+                });
+            }
             if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
                 layer.bringToFront();
             }
@@ -1130,8 +1138,36 @@
 
         function resetAdminFeatureHighlight(e, layerName, layerGroup) {
             const layer = e.target;
-            // Both modes: reset to outline-only style (no fill)
-            layerGroup.resetStyle(layer);
+            if (currentMode === 'caste') {
+                const pct = getCastePercentage(layerName, layer.feature, selectedCaste);
+                const layerBorderColors = { district: '#0d9488', ac: '#be123c', pc: '#4338ca', od: '#d97706' };
+                const borderColor = layerBorderColors[layerName] || '#475569';
+                
+                const rangeKey = getRangeKeyForPercentage(pct);
+                const isColorHidden = window.hiddenColorsByRange[rangeKey];
+
+                if (choroplethFillEnabled && !isColorHidden) {
+                    const color = getColorForPercentage(pct, 0, 50);
+                    layer.setStyle({
+                        fill: true,
+                        fillColor: color,
+                        fillOpacity: 0.65,
+                        weight: layerName === 'ac' ? 1.5 : 2,
+                        color: '#ffffff',
+                        opacity: 0.9
+                    });
+                } else {
+                    layer.setStyle({
+                        fill: true,
+                        fillOpacity: 0,
+                        weight: layerName === 'ac' ? 1.5 : 2,
+                        color: borderColor,
+                        opacity: 0.85
+                    });
+                }
+            } else {
+                layerGroup.resetStyle(layer);
+            }
         }
 
         const districtLayer = L.geoJSON(punjabDistrictData, {
@@ -1581,10 +1617,8 @@
 
         // Caste Data Lookup and Parsing Functions
         function getCasteDataForFeature(layerName, feature) {
-            if (layerName === 'district' || layerName === 'od') {
-                // For OD (Organizational Districts) we try to match by name to district data
+            if (layerName === 'district') {
                 let distName = feature.properties.Dist_Name || feature.properties.dist_name || feature.properties.name || "";
-                // Normalize GeoJSON names to match caste data keys
                 const distNameMap = {
                     'Muktsar': 'Mukatsar',
                     'Rupnagar': 'Rup Nagar',
@@ -1593,28 +1627,45 @@
                 };
                 if (distNameMap[distName]) distName = distNameMap[distName];
                 if (districtCasteData[distName]) return districtCasteData[distName];
-                // Try fuzzy match for OD names
                 const cleanDist = distName.replace(/\./g, '').replace(/\s+/g, ' ').trim().toUpperCase();
                 for (const k in districtCasteData) {
                     const cleanK = k.replace(/\./g, '').replace(/\s+/g, ' ').trim().toUpperCase();
-                    if (cleanK === cleanDist || cleanK.includes(cleanDist) || cleanDist.includes(cleanK)) {
-                        return districtCasteData[k];
+                    if (cleanK === cleanDist || cleanK.includes(cleanDist) || cleanDist.includes(cleanK)) return districtCasteData[k];
+                }
+                return null;
+            } else if (layerName === 'od') {
+                let odName = feature.properties.Dist_Name || feature.properties.dist_name || feature.properties.name || "";
+                if (typeof odCasteData !== 'undefined') {
+                    if (odCasteData[odName]) return odCasteData[odName];
+                    const cleanOD = odName.replace(/\./g, '').replace(/\s+/g, ' ').trim().toUpperCase();
+                    for (const k in odCasteData) {
+                        const cleanK = k.replace(/\./g, '').replace(/\s+/g, ' ').trim().toUpperCase();
+                        if (cleanK === cleanOD || cleanK.includes(cleanOD) || cleanOD.includes(cleanK)) return odCasteData[k];
                     }
                 }
                 return null;
-            } else if (layerName === 'ac' || layerName === 'pc') {
-                // For PC (Parliamentary Constituencies) we try to match to AC data by name
-                const rawName = feature.properties.AC_NAME || feature.properties.ac_name || 
-                                feature.properties.PC_NAME || feature.properties.pc_name || "";
-                // Direct match first
+            } else if (layerName === 'pc') {
+                const rawName = feature.properties.PC_NAME || feature.properties.pc_name || feature.properties.AC_NAME || feature.properties.name || "";
+                if (typeof pcCasteData !== 'undefined') {
+                    if (pcCasteData[rawName]) return pcCasteData[rawName];
+                    function normalizeName(s) {
+                        return s.replace(/^\d+\.\s*/, '').replace(/\s*\(SC\)\s*$/i, '').replace(/\s*\(SC?\s*$/i, '').replace(/\./g, '').replace(/\s+/g, ' ').trim().toUpperCase();
+                    }
+                    const cleanP = normalizeName(rawName);
+                    for (const k in pcCasteData) {
+                        if (normalizeName(k) === cleanP || normalizeName(k).includes(cleanP) || cleanP.includes(normalizeName(k))) return pcCasteData[k];
+                    }
+                }
+                return null;
+            } else if (layerName === 'ac') {
+                const rawName = feature.properties.AC_NAME || feature.properties.ac_name || feature.properties.name || "";
                 if (acCasteData[rawName]) return acCasteData[rawName];
-                // Normalize function for name comparison
                 function normalizeAcName(s) {
-                    return s.replace(/^\d+\.\s*/, '')           // strip leading "71. "
-                            .replace(/\s*\(SC\)\s*$/i, '')     // strip full (SC)
-                            .replace(/\s*\(SC?\s*$/i, '')      // strip truncated (SC or (S
-                            .replace(/\./g, '')                 // remove dots
-                            .replace(/\s+/g, ' ')              // collapse whitespace
+                    return s.replace(/^\d+\.\s*/, '')
+                            .replace(/\s*\(SC\)\s*$/i, '')
+                            .replace(/\s*\(SC?\s*$/i, '')
+                            .replace(/\./g, '')
+                            .replace(/\s+/g, ' ')
                             .trim().toUpperCase();
                 }
                 const cleanName = normalizeAcName(rawName);
@@ -1684,8 +1735,11 @@
             
             layer.eachLayer(l => {
                 const pct = getCastePercentage(layerName, l.feature, selectedCaste);
-                // Apply fill based on choropleth toggle
-                if (choroplethFillEnabled) {
+                const rangeKey = getRangeKeyForPercentage(pct);
+                const isColorHidden = window.hiddenColorsByRange[rangeKey];
+                
+                // Apply fill based on choropleth toggle and range visibility
+                if (choroplethFillEnabled && !isColorHidden) {
                     const color = getColorForPercentage(pct, 0, 50);
                     l.setStyle({
                         fill: true,
@@ -1736,7 +1790,7 @@
             });
             
             renderCasteSidebar(layerName, layer, minVal, maxVal);
-            updateCasteLegend(minVal, maxVal);
+            updateCasteLegend(values);
             
             // Show boundary name labels if Clean View is active
             updateBoundaryLabelsIfNeeded();
@@ -1761,22 +1815,282 @@
             return (name || '').replace(/[^a-zA-Z0-9]/g, '_');
         }
 
-        function getColorForPercentage(val, minVal, maxVal) {
-            if (val === 0) return "#f1f5f9";
-            const range = maxVal - minVal || 1.0;
-            const factor = Math.min(Math.max((val - minVal) / range, 0), 1);
-            const lightness = 92 - (factor * 57);
-            return `hsl(262, 70%, ${lightness}%)`;
+        window.legendIntervalMode = 10;
+        window.customCasteColors = {
+            '0': '#F3F8FC',
+            '5': '#F1F8F1',
+            '10': '#F0F9E6',
+            '15': '#DBF0D6',
+            '20': '#C6E6C7',
+            '25': '#ACDECE',
+            '30': '#91D6BF',
+            '35': '#65B5C1',
+            '40': '#3995C4',
+            '45': '#1E7EBA',
+            '50': '#0569B0'
+        };
+        window.hiddenNamesByRange = {};
+        window.hiddenColorsByRange = {};
+
+        function getRangeKeyForPercentage(val) {
+            if (val === 0) return '0';
+            if (window.legendIntervalMode === 5) {
+                if (val <= 5) return '5';
+                if (val <= 10) return '10';
+                if (val <= 15) return '15';
+                if (val <= 20) return '20';
+                if (val <= 25) return '25';
+                if (val <= 30) return '30';
+                if (val <= 35) return '35';
+                if (val <= 40) return '40';
+                if (val <= 45) return '45';
+                return '50';
+            } else {
+                if (val <= 10) return '10';
+                if (val <= 20) return '20';
+                if (val <= 30) return '30';
+                if (val <= 40) return '40';
+                return '50';
+            }
         }
 
-        function updateCasteLegend(minVal, maxVal) {
+        function refreshCasteLayerColors() {
+            if (currentMode === 'caste') {
+                let activeLayerObj = null;
+                if (activeCasteLayer === 'district') activeLayerObj = districtLayer;
+                else if (activeCasteLayer === 'ac') activeLayerObj = assemblyLayer;
+                else if (activeCasteLayer === 'pc') activeLayerObj = parliamentLayer;
+                else if (activeCasteLayer === 'od') activeLayerObj = odLayer;
+                
+                if (activeLayerObj) {
+                    const layerBorderColors = { district: '#0d9488', ac: '#be123c', pc: '#4338ca', od: '#d97706' };
+                    const borderColor = layerBorderColors[activeCasteLayer] || '#475569';
+                    
+                    activeLayerObj.eachLayer(l => {
+                        const pct = getCastePercentage(activeCasteLayer, l.feature, selectedCaste);
+                        const rangeKey = getRangeKeyForPercentage(pct);
+                        const hideColor = window.hiddenColorsByRange[rangeKey];
+                        
+                        if (choroplethFillEnabled && !hideColor) {
+                            const color = getColorForPercentage(pct, 0, 50);
+                            l.setStyle({
+                                fill: true,
+                                fillColor: color,
+                                fillOpacity: 0.65,
+                                weight: 1.5,
+                                color: '#ffffff',
+                                opacity: 0.9
+                            });
+                        } else {
+                            l.setStyle({
+                                fill: true,
+                                fillOpacity: 0,
+                                weight: activeCasteLayer === 'ac' ? 1.5 : 2,
+                                color: borderColor,
+                                opacity: 0.85
+                            });
+                        }
+                    });
+                }
+            }
+        }
+
+        function showCasteRangeEditor(rowElement, range, currentColor) {
+            const existing = document.getElementById('caste-range-editor');
+            if (existing) existing.remove();
+
+            const editor = document.createElement('div');
+            editor.id = 'caste-range-editor';
+            
+            // Inline styling to ensure visual consistency
+            editor.style.position = 'absolute';
+            editor.style.zIndex = '1000';
+            editor.style.background = 'rgba(255, 255, 255, 0.96)';
+            editor.style.backdropFilter = 'blur(10px)';
+            editor.style.webkitBackdropFilter = 'blur(10px)';
+            editor.style.border = '1px solid rgba(0, 0, 0, 0.08)';
+            editor.style.borderRadius = '12px';
+            editor.style.padding = '12px';
+            editor.style.boxShadow = '0 10px 30px rgba(0, 0, 0, 0.12)';
+            editor.style.fontFamily = "'Outfit', sans-serif";
+            editor.style.width = '200px';
+            editor.style.color = '#0f172a';
+            
+            if (window.L && L.DomEvent) {
+                L.DomEvent.disableClickPropagation(editor);
+                L.DomEvent.disableScrollPropagation(editor);
+            }
+
+            const isNameHidden = !!window.hiddenNamesByRange[range.key];
+            const isColorHidden = !!window.hiddenColorsByRange[range.key];
+
+            editor.innerHTML = `
+                <div style="font-weight: 700; font-size: 11px; color: #1e293b; margin-bottom: 8px; border-bottom: 1px solid rgba(0,0,0,0.06); padding-bottom: 4px; display: flex; justify-content: space-between; align-items: center;">
+                    <span style="text-transform: uppercase; letter-spacing: 0.5px;">Margin: ${range.label}</span>
+                    <button class="close-editor-btn" style="background:none; border:none; color:#94a3b8; cursor:pointer; font-size:14px; font-weight:bold; padding: 0 4px; line-height: 1;">&times;</button>
+                </div>
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                    <span style="font-size: 11px; font-weight: 600; color: #475569;">Range Color</span>
+                    <input type="color" id="editor-color-picker" value="${currentColor}" style="width: 44px; height: 24px; border: 1px solid rgba(0, 0, 0, 0.12); border-radius: 6px; cursor: pointer; padding: 0; background: none;" />
+                </div>
+                <div style="display: flex; gap: 6px; border-top: 1px solid rgba(0,0,0,0.06); padding-top: 8px;">
+                    <button id="editor-toggle-names" style="
+                        flex: 1; padding: 6px 0; font-size: 10px; font-family: inherit; font-weight: 600;
+                        border-radius: 6px; cursor: pointer; border: 1px solid ${isNameHidden ? '#ef4444' : 'rgba(0,0,0,0.08)'};
+                        background: ${isNameHidden ? 'rgba(239, 68, 68, 0.08)' : '#f8fafc'};
+                        color: ${isNameHidden ? '#ef4444' : '#64748b'};
+                        transition: all 0.2s ease;
+                        display: flex; align-items: center; justify-content: center; gap: 4px;
+                    ">
+                        <i class="fa-solid ${isNameHidden ? 'fa-font-slash' : 'fa-font'}"></i>
+                        Hide Names
+                    </button>
+                    <button id="editor-toggle-colors" style="
+                        flex: 1; padding: 6px 0; font-size: 10px; font-family: inherit; font-weight: 600;
+                        border-radius: 6px; cursor: pointer; border: 1px solid ${isColorHidden ? '#ef4444' : 'rgba(0,0,0,0.08)'};
+                        background: ${isColorHidden ? 'rgba(239, 68, 68, 0.08)' : '#f8fafc'};
+                        color: ${isColorHidden ? '#ef4444' : '#64748b'};
+                        transition: all 0.2s ease;
+                        display: flex; align-items: center; justify-content: center; gap: 4px;
+                    ">
+                        <i class="fa-solid ${isColorHidden ? 'fa-eye-slash' : 'fa-eye'}"></i>
+                        Hide Colors
+                    </button>
+                </div>
+            `;
+
+            document.body.appendChild(editor);
+
+            // Position next to the double-clicked row (to the left)
+            const rect = rowElement.getBoundingClientRect();
+            const editorRect = editor.getBoundingClientRect();
+            
+            let leftPos = rect.left - editorRect.width - 10;
+            if (leftPos < 10) {
+                leftPos = rect.right + 10;
+            }
+            let topPos = rect.top + (rect.height - editorRect.height) / 2;
+            if (topPos < 10) topPos = 10;
+            if (topPos + editorRect.height > window.innerHeight) {
+                topPos = window.innerHeight - editorRect.height - 10;
+            }
+            
+            editor.style.left = leftPos + 'px';
+            editor.style.top = topPos + 'px';
+
+            editor.querySelector('.close-editor-btn').addEventListener('click', () => {
+                editor.remove();
+            });
+
+            const colorPickerInput = editor.querySelector('#editor-color-picker');
+            colorPickerInput.addEventListener('input', (e) => {
+                const newVal = e.target.value.toUpperCase();
+                window.customCasteColors[range.key] = newVal;
+                refreshCasteLayerColors();
+                updateLegend();
+            });
+
+            const toggleNamesBtn = editor.querySelector('#editor-toggle-names');
+            toggleNamesBtn.addEventListener('click', () => {
+                const currentVal = !window.hiddenNamesByRange[range.key];
+                window.hiddenNamesByRange[range.key] = currentVal;
+                
+                toggleNamesBtn.style.border = currentVal ? '1px solid #ef4444' : '1px solid rgba(0,0,0,0.08)';
+                toggleNamesBtn.style.background = currentVal ? 'rgba(239, 68, 68, 0.08)' : '#f8fafc';
+                toggleNamesBtn.style.color = currentVal ? '#ef4444' : '#64748b';
+                toggleNamesBtn.innerHTML = `<i class="fa-solid ${currentVal ? 'fa-font-slash' : 'fa-font'}"></i> Hide Names`;
+                
+                updateBoundaryLabelsIfNeeded();
+                updateLegend();
+            });
+            toggleNamesBtn.addEventListener('mouseenter', () => {
+                if (!window.hiddenNamesByRange[range.key]) {
+                    toggleNamesBtn.style.background = '#e2e8f0';
+                }
+            });
+            toggleNamesBtn.addEventListener('mouseleave', () => {
+                if (!window.hiddenNamesByRange[range.key]) {
+                    toggleNamesBtn.style.background = '#f8fafc';
+                }
+            });
+
+            const toggleColorsBtn = editor.querySelector('#editor-toggle-colors');
+            toggleColorsBtn.addEventListener('click', () => {
+                const currentVal = !window.hiddenColorsByRange[range.key];
+                window.hiddenColorsByRange[range.key] = currentVal;
+
+                toggleColorsBtn.style.border = currentVal ? '1px solid #ef4444' : '1px solid rgba(0,0,0,0.08)';
+                toggleColorsBtn.style.background = currentVal ? 'rgba(239, 68, 68, 0.08)' : '#f8fafc';
+                toggleColorsBtn.style.color = currentVal ? '#ef4444' : '#64748b';
+                toggleColorsBtn.innerHTML = `<i class="fa-solid ${currentVal ? 'fa-eye-slash' : 'fa-eye'}"></i> Hide Colors`;
+
+                refreshCasteLayerColors();
+                updateLegend();
+            });
+            toggleColorsBtn.addEventListener('mouseenter', () => {
+                if (!window.hiddenColorsByRange[range.key]) {
+                    toggleColorsBtn.style.background = '#e2e8f0';
+                }
+            });
+            toggleColorsBtn.addEventListener('mouseleave', () => {
+                if (!window.hiddenColorsByRange[range.key]) {
+                    toggleColorsBtn.style.background = '#f8fafc';
+                }
+            });
+
+            const clickOutsideHandler = (event) => {
+                if (!editor.contains(event.target) && !rowElement.contains(event.target)) {
+                    editor.remove();
+                    document.removeEventListener('click', clickOutsideHandler);
+                }
+            };
+            setTimeout(() => {
+                document.addEventListener('click', clickOutsideHandler);
+            }, 50);
+        }
+
+        function getColorForPercentage(val, minVal, maxVal) {
+            if (val === 0) return window.customCasteColors['0'];
+            if (window.legendIntervalMode === 5) {
+                if (val <= 5) return window.customCasteColors['5'];
+                if (val <= 10) return window.customCasteColors['10'];
+                if (val <= 15) return window.customCasteColors['15'];
+                if (val <= 20) return window.customCasteColors['20'];
+                if (val <= 25) return window.customCasteColors['25'];
+                if (val <= 30) return window.customCasteColors['30'];
+                if (val <= 35) return window.customCasteColors['35'];
+                if (val <= 40) return window.customCasteColors['40'];
+                if (val <= 45) return window.customCasteColors['45'];
+                return window.customCasteColors['50'];
+            } else {
+                if (val <= 10) return window.customCasteColors['10'];
+                if (val <= 20) return window.customCasteColors['20'];
+                if (val <= 30) return window.customCasteColors['30'];
+                if (val <= 40) return window.customCasteColors['40'];
+                return window.customCasteColors['50'];
+            }
+        }
+
+        function toggleLegendInterval() {
+            window.legendIntervalMode = window.legendIntervalMode === 10 ? 5 : 10;
+            if (typeof currentMode !== 'undefined' && currentMode === 'caste') {
+                setActiveCasteLayer(activeCasteLayer);
+            }
+        }
+
+        function updateCasteLegend(values) {
             const legendDiv = document.querySelector('.map-legend');
             if (!legendDiv) return;
+            
+            // Prevent map zooming and scrolling when interacting with the legend
+            if (window.L && L.DomEvent) {
+                L.DomEvent.disableClickPropagation(legendDiv);
+                L.DomEvent.disableScrollPropagation(legendDiv);
+            }
             
             const displayLabel = selectedCaste === '__ALL__' ? 
                 (activeCategoryFilter === 'ALL' ? 'SC Population' : `${activeCategoryFilter} Category Total`) : 
                 selectedCaste;
-            const step = (maxVal - minVal) / 5;
             
             // Toggle button styling
             const btnBg = choroplethFillEnabled ? '#1e293b' : 'rgba(99, 102, 241, 0.1)';
@@ -1786,7 +2100,7 @@
             const btnIcon = choroplethFillEnabled ? 'fa-eye-slash' : 'fa-palette';
             
             legendDiv.innerHTML = `
-                <div class="legend-title">${displayLabel} %</div>
+                <div class="legend-title" style="cursor:pointer;" title="Click to toggle 5% / 10% intervals" onclick="toggleLegendInterval()">${displayLabel} %</div>
                 <div style="margin: 6px 0 8px 0;">
                     <button onclick="toggleChoroplethFill()" style="
                         display: inline-flex; align-items: center; gap: 5px;
@@ -1802,23 +2116,73 @@
                     </button>
                 </div>
             `;
-            const fixedRanges = [
-                { label: '0%', val: 0 },
-                { label: '0 – 10%', val: 5 },
-                { label: '10 – 20%', val: 15 },
-                { label: '20 – 30%', val: 25 },
-                { label: '30 – 40%', val: 35 },
-                { label: '40 – 50%', val: 45 }
-            ];
+            let fixedRanges = [];
+            if (window.legendIntervalMode === 5) {
+                fixedRanges = [
+                    { label: '0%', min: -0.1, max: 0, key: '0' },
+                    { label: '0 – 5%', min: 0, max: 5, key: '5' },
+                    { label: '5 – 10%', min: 5, max: 10, key: '10' },
+                    { label: '10 – 15%', min: 10, max: 15, key: '15' },
+                    { label: '15 – 20%', min: 15, max: 20, key: '20' },
+                    { label: '20 – 25%', min: 20, max: 25, key: '25' },
+                    { label: '25 – 30%', min: 25, max: 30, key: '30' },
+                    { label: '30 – 35%', min: 30, max: 35, key: '35' },
+                    { label: '35 – 40%', min: 35, max: 40, key: '40' },
+                    { label: '40 – 45%', min: 40, max: 45, key: '45' },
+                    { label: '45 – 50%', min: 45, max: 50, key: '50' }
+                ];
+            } else {
+                fixedRanges = [
+                    { label: '0%', min: -0.1, max: 0, key: '0' },
+                    { label: '0 – 10%', min: 0, max: 10, key: '10' },
+                    { label: '10 – 20%', min: 10, max: 20, key: '20' },
+                    { label: '20 – 30%', min: 20, max: 30, key: '30' },
+                    { label: '30 – 40%', min: 30, max: 40, key: '40' },
+                    { label: '40 – 50%', min: 40, max: 50, key: '50' }
+                ];
+            }
             
-            for (const range of fixedRanges) {
-                const color = getColorForPercentage(range.val, 0, 50);
-                legendDiv.innerHTML += `
-                    <div class="legend-row">
-                        <div class="legend-color" style="background: ${color}"></div>
-                        <span>${range.label}</span>
-                    </div>
+            const activeRanges = fixedRanges.filter(range => {
+                return values.some(val => {
+                    if (range.key === '0') return val === 0;
+                    return val > range.min && val <= range.max;
+                });
+            });
+            
+            for (const range of activeRanges) {
+                const color = getColorForPercentage(range.max, 0, 50);
+                const row = document.createElement('div');
+                row.className = 'legend-row';
+                row.title = "Double-click to edit color / visibility";
+                row.style.cursor = "pointer";
+                
+                const isNameHidden = !!window.hiddenNamesByRange[range.key];
+                const isColorHidden = !!window.hiddenColorsByRange[range.key];
+                
+                let iconsHtml = '';
+                if (isNameHidden) {
+                    iconsHtml += `<span style="display:inline-flex; align-items:center; margin-left:4px;" title="Names hidden"><i class="fa-solid fa-font-slash" style="font-size: 8px; color: #ef4444;"></i></span>`;
+                }
+                if (isColorHidden) {
+                    iconsHtml += `<span style="display:inline-flex; align-items:center; margin-left:4px;" title="Colors hidden"><i class="fa-solid fa-eye-slash" style="font-size: 8px; color: #ef4444;"></i></span>`;
+                }
+
+                row.innerHTML = `
+                    <div class="legend-color" style="
+                        background: ${isColorHidden ? 'transparent' : color};
+                        border: ${isColorHidden ? '1px dashed #ef4444' : 'none'};
+                        width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0;
+                    "></div>
+                    <span style="opacity: ${isColorHidden && isNameHidden ? 0.5 : 1};">${range.label}${iconsHtml}</span>
                 `;
+                
+                row.addEventListener('dblclick', (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    showCasteRangeEditor(row, range, color);
+                });
+                
+                legendDiv.appendChild(row);
             }
         }
 
@@ -1844,7 +2208,7 @@
                     });
                     const maxVal = Math.max(...values, 0.1);
                     const minVal = Math.min(...values, 0.0);
-                    updateCasteLegend(minVal, maxVal);
+                    updateCasteLegend(values);
                 }
             } else {
                 const legendDiv = document.querySelector('.map-legend');
@@ -1882,8 +2246,30 @@
             
             items.sort((a, b) => b.pct - a.pct);
             
-            const sumPct = items.reduce((acc, curr) => acc + curr.pct, 0);
-            const avgPct = items.length ? (sumPct / items.length) : 0.0;
+            // Update average math correctly by using true stateCasteData if available
+            let avgPct = 0.0;
+            if (typeof stateCasteData !== 'undefined' && selectedCaste !== '__ALL__') {
+                if (activeCategoryFilter !== 'ALL') {
+                    // It's a category
+                    avgPct = stateCasteData.categories[selectedCaste] || 0.0;
+                } else {
+                    // It's a specific caste
+                    const casteObj = stateCasteData.castes.find(c => c.name === selectedCaste);
+                    if (casteObj) avgPct = casteObj.percentage;
+                }
+            } else if (typeof stateCasteData !== 'undefined' && selectedCaste === '__ALL__') {
+                // if selectedCaste is ALL, the user is looking at a category total
+                if (activeCategoryFilter !== 'ALL') {
+                    avgPct = stateCasteData.categories[activeCategoryFilter] || 0.0;
+                } else {
+                    // if EVERYTHING is ALL, avg is 100%? Or avg of SC? The previous code said SC Population.
+                    avgPct = stateCasteData.categories['SC'] || 0.0;
+                }
+            } else {
+                // Fallback to naive averaging if state data missing
+                const sumPct = items.reduce((acc, curr) => acc + curr.pct, 0);
+                avgPct = items.length ? (sumPct / items.length) : 0.0;
+            }
             
             document.getElementById("stat-primary").innerText = avgPct.toFixed(2) + "%";
             document.getElementById("stat-primary-lbl").innerText = `Avg ${displayLabel}`;
@@ -2666,6 +3052,12 @@
             layer.eachLayer(l => {
                 const name = getFeatureName(layerName, l.feature);
                 if (!name || name === 'Unknown') return;
+                
+                // Skip adding label if the range visibility is turned off
+                const pct = getCastePercentage(layerName, l.feature, selectedCaste);
+                const rangeKey = getRangeKeyForPercentage(pct);
+                if (window.hiddenNamesByRange[rangeKey]) return;
+
                 const center = l.getBounds().getCenter();
                 const label = L.tooltip({
                     permanent: true,
@@ -2747,6 +3139,8 @@
         const legend = L.control({ position: 'bottomright' });
         legend.onAdd = function () {
             const div = L.DomUtil.create('div', 'map-legend');
+            L.DomEvent.disableClickPropagation(div);
+            L.DomEvent.disableScrollPropagation(div);
             div.innerHTML = `
                 <div class="legend-title">Party Legend</div>
                 <div class="legend-row">
@@ -2841,8 +3235,15 @@
             return result;
         }
 
-        function hslStringToRgb(hslStr) {
-            const m = hslStr.match(/hsl\(\s*(\d+)\s*,\s*(\d+)%\s*,\s*([\d\.]+)%\s*\)/);
+        function colorToRgb(colorStr) {
+            if (colorStr.startsWith('#')) {
+                const hex = colorStr.replace('#', '');
+                const r = parseInt(hex.substring(0, 2), 16);
+                const g = parseInt(hex.substring(2, 4), 16);
+                const b = parseInt(hex.substring(4, 6), 16);
+                return [r, g, b];
+            }
+            const m = colorStr.match(/hsl\(\s*(\d+)\s*,\s*(\d+)%\s*,\s*([\d\.]+)%\s*\)/);
             if (!m) return [255, 255, 255];
             const h = parseInt(m[1]) / 360;
             const s = parseInt(m[2]) / 100;
@@ -3035,7 +3436,7 @@
                 if (currentMode === 'caste') {
                     casteLegendSteps.forEach((step, i) => {
                         const y = legendY + 38 + i * rowHeight;
-                        const rgb = hslStringToRgb(step.color);
+                        const rgb = colorToRgb(step.color);
                         pdf.setFillColor(rgb[0], rgb[1], rgb[2]);
                         pdf.roundedRect(legendX + legendPadding, y - 9, 12, 12, 2, 2, 'F');
                         

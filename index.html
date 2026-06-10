@@ -19,6 +19,8 @@
     <!-- html2canvas + jsPDF for PDF export -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- Turf.js for visual centroid calculation to prevent label overlap/edges -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/6.5.0/turf.min.js"></script>
     
     <style>
         :root {
@@ -27,6 +29,8 @@
             --bg-glass-hover: rgba(255, 255, 255, 0.95);
             --border-light: rgba(0, 0, 0, 0.06);
             --border-focus: rgba(37, 99, 235, 0.4);
+            --color-assembly: #ea580c;   /* Orange for Assembly */
+            --color-route: #2563eb;      /* Blue for Route */
             
             --text-primary: #0f172a;
             --text-secondary: #475569;
@@ -914,6 +918,445 @@
         .leaflet-interactive:focus {
             outline: none !important;
         }
+        /* Print Media Query for True Vector PDF Export */
+        @media print {
+            @page {
+                size: landscape;
+                margin: 0;
+            }
+            body, html, #app-container {
+                width: 100vw !important;
+                height: 100vh !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                overflow: hidden !important;
+            }
+            #sidebar, 
+            .leaflet-control-container, 
+            #city-header-overlay, 
+            .mode-selector-container,
+            .map-legend,
+            #toggle-names-btn {
+                display: none !important;
+            }
+            #map {
+                width: 100vw !important;
+                height: 100vh !important;
+                position: absolute !important;
+                top: 0 !important;
+                left: 0 !important;
+                z-index: 9999 !important;
+                transform: none !important;
+            }
+            /* Prevent SVG paths from rendering pixelated, blurry, or like sketch pens on print */
+            svg.leaflet-zoom-animated path {
+                vector-effect: none !important;
+                stroke-linecap: round !important;
+                stroke-linejoin: round !important;
+                stroke-opacity: 1 !important; /* Force solid borders, avoiding fuzzy overlapping transparency */
+            }
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+        }
+
+        /* High-Res print mode layout (triggered via JS before window.print) */
+        body.print-mode {
+            overflow: visible !important;
+        }
+        body.print-mode #sidebar,
+        body.print-mode .leaflet-control-container,
+        body.print-mode #city-header-overlay,
+        body.print-mode .mode-selector-container,
+        body.print-mode .map-legend,
+        body.print-mode #toggle-names-btn {
+            display: none !important;
+        }
+        body.print-mode #map {
+            width: 100% !important;
+            height: 100% !important;
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+            z-index: 9999 !important;
+            transform: none !important;
+        }
+
+        /* Interactive Tabs */
+        .tabs-header {
+            display: flex;
+            border-bottom: 1px solid var(--border-light);
+            background: #ffffff;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            background: none;
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text-secondary);
+            cursor: pointer;
+            outline: none;
+            text-align: center;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .tab-btn.active {
+            color: var(--color-assembly);
+            border-bottom-color: var(--color-assembly);
+            background: rgba(234, 88, 12, 0.01);
+        }
+
+        /* Action Buttons */
+        .btn {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.2s;
+            outline: none;
+        }
+
+        .btn-primary {
+            background: var(--color-assembly);
+            color: #ffffff;
+            box-shadow: 0 4px 12px rgba(234, 88, 12, 0.2);
+        }
+
+        .btn-primary:hover {
+            background: #ea580c;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(234, 88, 12, 0.3);
+        }
+
+        .btn-secondary {
+            background: #f1f5f9;
+            color: var(--text-primary);
+            border: 1px solid var(--border-light);
+        }
+
+        .btn-secondary:hover {
+            background: #e2e8f0;
+        }
+
+        .btn-secondary.active {
+            background: #475569;
+            color: #ffffff;
+            border-color: #475569;
+        }
+
+        .btn-accent {
+            background: var(--color-route);
+            color: #ffffff;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+        }
+
+        .btn-accent:hover {
+            background: #1d4ed8;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(37, 99, 235, 0.3);
+        }
+
+        #flyover-btn {
+            background: #2563eb;
+        }
+
+        #flyover-btn:hover {
+            background: #1d4ed8;
+        }
+
+        /* Route Planner Styles */
+        .route-section {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .route-instruction {
+            font-size: 12px;
+            color: var(--text-secondary);
+            line-height: 1.5;
+            background: rgba(37, 99, 235, 0.04);
+            border: 1px dashed rgba(37, 99, 235, 0.25);
+            border-radius: 8px;
+            padding: 10px 12px;
+            margin-bottom: 8px;
+        }
+
+        .route-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 280px;
+            overflow-y: auto;
+            margin-bottom: 12px;
+            padding-right: 4px;
+        }
+
+        .route-item {
+            background: #f8fafc;
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            padding: 8px 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+
+        .route-item.drag-over {
+            border-top: 2px solid var(--color-route);
+            background: #eff6ff;
+        }
+
+        .route-action-btn.insert-active {
+            color: var(--color-route);
+            background: rgba(37, 99, 235, 0.1);
+        }
+
+        .route-item-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .route-idx {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--color-route);
+            color: #ffffff;
+            font-size: 10px;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .route-item-name {
+            font-weight: 600;
+        }
+
+        .route-item-actions {
+            display: flex;
+            gap: 4px;
+        }
+
+        .route-action-btn {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 4px;
+            font-size: 12px;
+            border-radius: 4px;
+            transition: all 0.1s;
+        }
+
+        .route-action-btn:hover {
+            color: var(--text-primary);
+            background: #e2e8f0;
+        }
+
+        .route-action-btn.delete:hover {
+            color: #ef4444;
+            background: #fee2e2;
+        }
+
+        .route-empty {
+            text-align: center;
+            padding: 30px 20px;
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+
+        .route-empty i {
+            font-size: 24px;
+            margin-bottom: 8px;
+            display: block;
+            color: #cbd5e1;
+        }
+
+        /* Saved Route Cards List */
+        .saved-route-card {
+            background: #f8fafc;
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            padding: 8px 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-bottom: 2px;
+        }
+        .saved-route-card:hover {
+            border-color: #ea580c;
+            background: #f1f5f9;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        }
+        .saved-route-card.active {
+            border-color: #ea580c;
+            background: rgba(234, 88, 12, 0.04);
+            box-shadow: 0 0 0 1px #ea580c;
+        }
+
+        /* Centroid Route Line Custom Animation */
+        @keyframes dash {
+            to {
+                stroke-dashoffset: -20;
+            }
+        }
+        .route-path {
+            stroke-dasharray: 10, 8;
+            animation: dash 1s linear infinite;
+        }
+
+        /* Numbered Route Custom DivIcon */
+        .custom-route-icon {
+            background: none !important;
+            border: none !important;
+        }
+        .route-marker-pin {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: var(--color-route);
+            border: 2px solid #ffffff;
+            color: #ffffff;
+            font-size: 11px;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            transition: all 0.2s;
+        }
+        .route-marker-pin:hover {
+            transform: scale(1.15);
+            background: #1d4ed8;
+        }
+
+        /* Custom Popup Grid */
+        .popup-header-box {
+            border-bottom: 1px solid var(--border-light);
+            padding-bottom: 6px;
+            margin-bottom: 8px;
+            font-family: 'Outfit', sans-serif;
+        }
+        .popup-title-text {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--color-assembly);
+        }
+        .popup-info-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 6px;
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+        .popup-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            font-weight: 500;
+        }
+        .popup-label {
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+        .popup-value {
+            color: var(--text-primary);
+            font-weight: 700;
+            text-align: right;
+        }
+
+        /* Custom Map Header Panel Card */
+        .map-header-panel {
+            position: absolute;
+            top: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 800;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid var(--border-light);
+            border-radius: 12px;
+            padding: 10px 24px;
+            box-shadow: 0 10px 25px rgba(15, 23, 42, 0.05);
+            text-align: center;
+            pointer-events: auto;
+            min-width: 250px;
+        }
+        .map-header-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+        .map-header-divider {
+            height: 2px;
+            width: 40px;
+            background: var(--color-assembly);
+            margin: 4px auto 3px auto;
+            border-radius: 1px;
+        }
+        .map-header-subtitle {
+            font-size: 10px;
+            color: var(--text-secondary);
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        /* Popup buttons */
+        .popup-actions {
+            margin-top: 10px;
+            border-top: 1px solid var(--border-light);
+            padding-top: 8px;
+            display: flex;
+            gap: 6px;
+        }
+        .popup-btn {
+            flex: 1;
+            padding: 5px 8px;
+            border: none;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.1s;
+        }
+        .popup-btn-add {
+            background: var(--color-route);
+            color: #ffffff;
+        }
+        .popup-btn-add:hover {
+            background: #1d4ed8;
+        }
+        .popup-btn-remove {
+            background: rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.2);
+        }
+        .popup-btn-remove:hover {
+            background: rgba(239, 68, 68, 0.2);
+        }
     </style>
 </head>
 <body>
@@ -922,71 +1365,219 @@
         
         <!-- Premium White Sidebar -->
         <div id="sidebar">
-            <div class="sidebar-header">
-                <div class="brand-logo">
-                    <i class="fa-solid fa-square-poll-vertical"></i>
-                    <h1 class="brand-title">Punjab Civic Polls</h1>
+            <div id="election-caste-sidebar" style="display: flex; flex-direction: column; height: 100%; flex: 1; overflow: hidden;">
+                <div class="sidebar-header">
+                    <div class="brand-logo">
+                        <i class="fa-solid fa-square-poll-vertical"></i>
+                        <h1 class="brand-title">Punjab Civic Polls</h1>
+                    </div>
+                    <div class="brand-subtitle">Civic Election Results 2026</div>
+                    
+                    <!-- Search Input Box -->
+                    <div class="search-box">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <input type="text" id="search-input" class="search-input" placeholder="Search by city...">
+                    </div>
                 </div>
-                <div class="brand-subtitle">Civic Election Results 2026</div>
                 
-                <!-- Search Input Box -->
-                <div class="search-box">
-                    <i class="fa-solid fa-magnifying-glass"></i>
-                    <input type="text" id="search-input" class="search-input" placeholder="Search by city...">
+                <!-- Caste Filter Dropdown (visible in Caste Mode) -->
+                <div id="caste-filter-container" class="caste-filter-container">
+                    <span class="caste-filter-label">Filter by Caste Category</span>
+                    <div class="caste-category-selector">
+                        <button class="caste-cat-btn active" data-cat="ALL" onclick="filterCasteDropdown('ALL')">All</button>
+                        <button class="caste-cat-btn" data-cat="GEN" onclick="filterCasteDropdown('GEN')">GEN</button>
+                        <button class="caste-cat-btn" data-cat="OBC" onclick="filterCasteDropdown('OBC')">OBC</button>
+                        <button class="caste-cat-btn" data-cat="SC" onclick="filterCasteDropdown('SC')">SC</button>
+                        <button class="caste-cat-btn" data-cat="MIN" onclick="filterCasteDropdown('MIN')">MIN</button>
+                        <button class="caste-cat-btn" data-cat="Others" onclick="filterCasteDropdown('Others')">Others</button>
+                    </div>
+                    <span class="caste-filter-label" style="margin-top: 8px;">Visualize Caste Distribution</span>
+                    <select id="caste-select" class="caste-select" onchange="handleCasteSelectChange(this.value)">
+                        <option value="__ALL__" selected>📊 All Castes Overview (Default)</option>
+                    </select>
                 </div>
-            </div>
-            
-            <!-- Caste Filter Dropdown (visible in Caste Mode) -->
-            <div id="caste-filter-container" class="caste-filter-container">
-                <span class="caste-filter-label">Filter by Caste Category</span>
-                <div class="caste-category-selector">
-                    <button class="caste-cat-btn active" data-cat="ALL" onclick="filterCasteDropdown('ALL')">All</button>
-                    <button class="caste-cat-btn" data-cat="GEN" onclick="filterCasteDropdown('GEN')">GEN</button>
-                    <button class="caste-cat-btn" data-cat="OBC" onclick="filterCasteDropdown('OBC')">OBC</button>
-                    <button class="caste-cat-btn" data-cat="SC" onclick="filterCasteDropdown('SC')">SC</button>
-                    <button class="caste-cat-btn" data-cat="MIN" onclick="filterCasteDropdown('MIN')">MIN</button>
-                    <button class="caste-cat-btn" data-cat="Others" onclick="filterCasteDropdown('Others')">Others</button>
+                
+                <!-- Navigation Banner for Wards backflow -->
+                <div id="navigation-banner" class="navigation-banner">
+                    <span id="current-view-title" class="current-view-title">Jandiala Guru</span>
+                    <button id="back-btn" class="back-btn">
+                        <i class="fa-solid fa-arrow-left"></i> State View
+                    </button>
                 </div>
-                <span class="caste-filter-label" style="margin-top: 8px;">Visualize Caste Distribution</span>
-                <select id="caste-select" class="caste-select" onchange="handleCasteSelectChange(this.value)">
-                    <option value="__ALL__" selected>📊 All Castes Overview (Default)</option>
-                </select>
-            </div>
-            
-            <!-- Navigation Banner for Wards backflow -->
-            <div id="navigation-banner" class="navigation-banner">
-                <span id="current-view-title" class="current-view-title">Jandiala Guru</span>
-                <button id="back-btn" class="back-btn">
-                    <i class="fa-solid fa-arrow-left"></i> State View
+                
+                <!-- Statistics Panel Cards -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div id="stat-primary" class="stat-val">102</div>
+                        <div id="stat-primary-lbl" class="stat-label">Conducted Polls</div>
+                    </div>
+                    <div class="stat-card">
+                        <div id="stat-secondary" class="stat-val">1,927</div>
+                        <div id="stat-secondary-lbl" class="stat-label">Total Wards Mapped</div>
+                    </div>
+                </div>
+                
+                <!-- Scrollable Content List -->
+                <div class="list-container">
+                    <div class="list-title">
+                        <span id="list-title-label">Elected Cities</span>
+                        <span id="list-count" class="list-count">102</span>
+                    </div>
+                    <div id="item-list">
+                        <!-- Loaded dynamically via js -->
+                    </div>
+                </div>
+                <!-- Download PDF Button -->
+                <button id="download-pdf-btn" class="download-btn" onclick="downloadPDF()">
+                    <i class="fa-solid fa-file-pdf"></i> Download View as PDF
                 </button>
             </div>
-            
-            <!-- Statistics Panel Cards -->
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div id="stat-primary" class="stat-val">102</div>
-                    <div id="stat-primary-lbl" class="stat-label">Conducted Polls</div>
+
+            <!-- Route Planner Sidebar -->
+            <div id="route-planner-sidebar" style="display: none; flex-direction: column; height: 100%; flex: 1; overflow: hidden;">
+                <div class="sidebar-header">
+                    <div class="brand-logo">
+                        <i class="fa-solid fa-map-location-dot"></i>
+                        <h1 class="brand-title">Punjab Assembly Map</h1>
+                    </div>
+                    <div class="brand-subtitle" id="sidebar-subtitle">117 Assembly Constituencies</div>
+                    
+                    <!-- Search Input Box -->
+                    <div class="search-box">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <input type="text" id="route-search-input" class="search-input" placeholder="Search by constituency or district...">
+                    </div>
                 </div>
-                <div class="stat-card">
-                    <div id="stat-secondary" class="stat-val">1,927</div>
-                    <div id="stat-secondary-lbl" class="stat-label">Total Wards Mapped</div>
+                
+                <!-- Stats Panel -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div id="stat-total" class="stat-val">117</div>
+                        <div class="stat-label" id="stat-total-label">Constituencies</div>
+                    </div>
+                    <div class="stat-card">
+                        <div id="stat-active-route" class="stat-val">0</div>
+                        <div class="stat-label">Route Points</div>
+                    </div>
+                </div>
+
+                <!-- Tab Buttons -->
+                <div class="tabs-header">
+                    <button id="tab-list" class="tab-btn active" onclick="switchTab('list')">🗳️ Constituency List</button>
+                    <button id="tab-route" class="tab-btn" onclick="switchTab('route')">📍 Route Planner</button>
+                </div>
+                
+                <!-- List View Tab -->
+                <div id="list-tab-content" class="list-container">
+                    <div class="list-title">
+                        <span id="list-title-text">Assembly Seats</span>
+                        <span id="list-count-route" class="list-count">117</span>
+                    </div>
+                    <div id="constituency-list">
+                        <!-- Dynamically populated -->
+                    </div>
+                </div>
+
+                <!-- Route Planner Tab -->
+                <div id="route-tab-content" class="list-container" style="display: none;">
+                    <div class="route-section">
+                        <div class="route-instruction">
+                            <i class="fa-solid fa-circle-info" style="color: var(--color-route); margin-right: 4px;"></i>
+                            Select a constituency from the list or click directly on the map to add points and build a route.
+                        </div>
+                        <div class="list-title">
+                            <span>Route Stops</span>
+                        </div>
+                        <div id="route-items-container" class="route-list">
+                            <!-- Dynamically populated stops -->
+                        </div>
+                        
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 4px; margin-bottom: 4px;">
+                            <span style="font-size: 13px; font-weight: 600; color: var(--text-secondary);">Route Color</span>
+                            <input type="color" id="route-color-picker" value="#2563eb" style="width: 44px; height: 26px; border: 1px solid var(--border-light); border-radius: 6px; cursor: pointer; padding: 0; background: none;" oninput="updateRouteColor(this.value)" />
+                        </div>
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+                            <span style="font-size: 13px; font-weight: 600; color: var(--text-secondary);">Border Color</span>
+                            <input type="color" id="border-color-picker" value="#ea580c" style="width: 44px; height: 26px; border: 1px solid var(--border-light); border-radius: 6px; cursor: pointer; padding: 0; background: none;" oninput="updateBorderColor(this.value)" />
+                        </div>
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; gap: 10px;">
+                            <span style="font-size: 13px; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Border Width</span>
+                            <input type="range" id="border-weight-slider" min="0" max="10" step="0.5" value="1.5" style="flex: 1; cursor: pointer; accent-color: var(--color-assembly);" oninput="updateBorderWeight(this.value)" />
+                            <span id="border-weight-value" style="font-size: 11px; font-weight: 600; color: var(--text-muted); min-width: 30px; text-align: right;">1.5</span>
+                        </div>
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+                            <span style="font-size: 13px; font-weight: 600; color: var(--text-secondary);">Fill Color</span>
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <label style="display: flex; align-items: center; gap: 3px; cursor: pointer; font-size: 10px; color: var(--text-muted); user-select: none; white-space: nowrap;" title="Match with Route Color">
+                                    <input type="checkbox" id="fill-match-route" onchange="toggleFillMatchRoute(this.checked)" style="cursor: pointer; width: 12px; height: 12px;" />
+                                    Match
+                                </label>
+                                <input type="color" id="fill-color-picker" value="#f97316" style="width: 44px; height: 26px; border: 1px solid var(--border-light); border-radius: 6px; cursor: pointer; padding: 0; background: none;" oninput="updateFillColor(this.value)" />
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; gap: 10px;">
+                            <span style="font-size: 13px; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Fill Opacity</span>
+                            <input type="range" id="fill-opacity-slider" min="0" max="100" value="12" style="flex: 1; cursor: pointer; accent-color: var(--primary-color);" oninput="updateFillOpacity(this.value)" />
+                            <span id="fill-opacity-value" style="font-size: 11px; font-weight: 600; color: var(--text-muted); min-width: 30px; text-align: right;">12%</span>
+                        </div>
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; border-bottom: 1px solid var(--border-light); padding-bottom: 8px;">
+                            <span style="font-size: 13px; font-weight: 600; color: var(--text-secondary); white-space: nowrap;" title="Colors boundaries not in a route. If no route, colors all.">Color Rest</span>
+                            <input type="checkbox" id="inverse-fill-checkbox" onchange="toggleInverseFill(this.checked)" style="cursor: pointer; width: 14px; height: 14px;" />
+                        </div>
+
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn btn-secondary" style="flex: 1;" onclick="clearRoute()"><i class="fa-solid fa-trash-can"></i> Clear</button>
+                            <button id="show-route-names-btn" class="btn btn-secondary" style="flex: 1;" onclick="toggleRouteNames()"><i class="fa-solid fa-font"></i> Names</button>
+                        </div>
+                        <div style="display: flex; gap: 8px; margin-top: 6px;">
+                            <button id="focus-route-btn" class="btn btn-secondary" style="flex: 1;" onclick="toggleRouteFocus()">
+                                <i class="fa-solid fa-eye-slash"></i> Focus
+                            </button>
+                            <button class="btn btn-secondary" style="flex: 1; background: rgba(16, 185, 129, 0.08); border-color: rgba(16, 185, 129, 0.2); color: #059669;" onclick="saveRoutePrompt()">
+                                <i class="fa-solid fa-floppy-disk"></i> Save
+                            </button>
+                        </div>
+                        <button id="flyover-btn" class="btn btn-accent" style="margin-top: 8px;" onclick="flyoverRoute()"><i class="fa-solid fa-plane"></i> Flyover Route</button>
+
+                        <div class="list-title" style="margin-top: 14px; margin-bottom: 6px;">
+                            <span>Saved Itineraries</span>
+                        </div>
+
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; gap: 8px;">
+                            <span style="font-size: 12px; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Active Route:</span>
+                            <div id="custom-multi-select" style="position: relative; flex: 1; font-family: 'Outfit', sans-serif;">
+                                <div class="search-input" style="padding: 6px 12px; font-size: 12px; min-height: 32px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; background: white;" onclick="document.getElementById('custom-route-options').style.display = document.getElementById('custom-route-options').style.display === 'none' ? 'block' : 'none';">
+                                    <span id="custom-route-title" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px;">+ Create New Route...</span>
+                                    <i class="fa-solid fa-chevron-down" style="font-size: 10px; opacity: 0.7;"></i>
+                                </div>
+                                <div id="custom-route-options" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: white; border: 1px solid var(--border-light); border-radius: 6px; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-height: 250px; overflow-y: auto;">
+                                    <!-- dynamically populated -->
+                                </div>
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px; margin-top: 8px; margin-bottom: 12px; border-bottom: 1px solid var(--border-light); padding-bottom: 8px;">
+                            <input type="checkbox" id="show-all-saved-routes-checkbox" onchange="toggleAllSavedRoutesVisibility(this.checked)" style="cursor: pointer; width: 15px; height: 15px;" />
+                            <label for="show-all-saved-routes-checkbox" style="font-size: 12px; font-weight: 600; color: var(--text-secondary); cursor: pointer; user-select: none; flex: 1;">
+                                Select All Routes
+                            </label>
+                        </div>
+
+                        <div id="saved-routes-list" style="display: flex; flex-direction: column; gap: 8px; margin-top: 4px; max-height: 200px; overflow-y: auto; padding-right: 2px;">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Action Buttons Footer -->
+                <div class="sidebar-footer">
+                    <button id="toggle-route-mode-btn" class="btn btn-secondary" onclick="toggleRouteMode()">
+                        <i class="fa-solid fa-route"></i> Enable Route Planning Mode
+                    </button>
+                    <button id="route-download-pdf-btn" class="btn btn-primary" onclick="downloadRoutePDF()">
+                        <i class="fa-solid fa-file-pdf"></i> Download Map as PDF
+                    </button>
                 </div>
             </div>
-            
-            <!-- Scrollable Content List -->
-            <div class="list-container">
-                <div class="list-title">
-                    <span id="list-title-label">Elected Cities</span>
-                    <span id="list-count" class="list-count">102</span>
-                </div>
-                <div id="item-list">
-                    <!-- Loaded dynamically via js -->
-                </div>
-            </div>
-            <!-- Download PDF Button -->
-            <button id="download-pdf-btn" class="download-btn" onclick="downloadPDF()">
-                <i class="fa-solid fa-file-pdf"></i> Download View as PDF
-            </button>
         </div>
         
         <!-- Leaflet Map Container -->
@@ -1007,7 +1598,18 @@
                         <span class="mode-item-title">📊 Caste Based Mapping</span>
                         <span class="mode-item-desc">Demographic distribution across administrative boundaries</span>
                     </div>
+                    <div class="mode-dropdown-item" id="mode-item-route" onclick="switchAppMode('route')">
+                        <span class="mode-item-title">📍 Route Planner</span>
+                        <span class="mode-item-desc">Plan campaign paths and view constituencies</span>
+                    </div>
                 </div>
+            </div>
+
+            <!-- Route Map Header overlay (for route mode) -->
+            <div class="map-header-panel" id="route-map-header-panel" style="display: none;">
+                <div class="map-header-title" id="panel-title">PUNJAB ASSEMBLY MAP</div>
+                <div class="map-header-divider"></div>
+                <div class="map-header-subtitle" id="panel-subtitle">State View</div>
             </div>
 
             <!-- City Header Overlay (shown on drill-down) -->
@@ -1017,6 +1619,11 @@
 
             <!-- Toggle Names Button (only visible in Clean View + Caste mode) -->
             <button id="toggle-names-btn" onclick="toggleBoundaryNames()">
+                <i class="fa-solid fa-font"></i> Show Names
+            </button>
+
+            <!-- Toggle Names Button for Route Mode -->
+            <button id="route-toggle-names-btn" style="display: none;" onclick="toggleRouteBoundaryNames()">
                 <i class="fa-solid fa-font"></i> Show Names
             </button>
         </div>
@@ -1032,6 +1639,12 @@
     <script src="election_data.js"></script>
     <!-- Punjab Assembly & Parliamentary Constituencies Data -->
     <script src="punjab_constituencies.js"></script>
+    <!-- Punjab District Boundaries Data -->
+    <script src="punjab_districts.js"></script>
+    <!-- Punjab Organizational Districts Boundaries Data -->
+    <script src="punjab_od.js"></script>
+    <!-- Assembly Election Detailed Results Data -->
+    <script src="assembly_results_data.js"></script>
     <!-- Punjab Caste Data (Generated) -->
     <script src="caste_data.js"></script>
     
@@ -1058,24 +1671,28 @@
         // OpenStreetMap - Full street-level detail with roads, places, building names
         const osmStreet = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
+            detectRetina: true,
             attribution: '&copy; OpenStreetMap contributors'
         });
 
         // CartoDB Voyager - Clean, modern, Google Maps-like style
         const cartoVoyager = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
             maxZoom: 20,
+            detectRetina: true,
             attribution: '&copy; CARTO'
         });
 
         // Google Satellite Imagery (pure aerial, no labels)
         const satelliteTiles = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
             maxZoom: 21,
+            detectRetina: true,
             attribution: '&copy; Google'
         });
 
         // Google Hybrid Overlay (satellite + full roads, shops, labels, landmarks)
         const hybridTiles = L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
             maxZoom: 21,
+            detectRetina: true,
             attribution: '&copy; Google'
         });
 
@@ -1122,14 +1739,30 @@
                     fillOpacity: (choroplethFillEnabled && !isColorHidden) ? 0.8 : 0
                 });
             } else {
-                layer.setStyle({
-                    weight: layerName === 'ac' ? 2.5 : (layerName === 'pc' ? 3.5 : 3),
-                    color: highlightColor,
-                    opacity: 1,
-                    fill: true,
-                    fillColor: 'transparent',
-                    fillOpacity: 0
-                });
+                if (layerName === 'ac' && assemblyColoringEnabled) {
+                    const props = layer.feature.properties;
+                    const acNo = props.AC_NO || props.ac_no || "";
+                    const result = typeof assemblyElectionResults !== 'undefined' ? assemblyElectionResults[acNo] : null;
+                    const color = result ? getPartyColor(result.winner_party) : 'transparent';
+                    
+                    layer.setStyle({
+                        weight: 2.5,
+                        color: highlightColor,
+                        opacity: 1,
+                        fill: true,
+                        fillColor: color,
+                        fillOpacity: 0.5
+                    });
+                } else {
+                    layer.setStyle({
+                        weight: layerName === 'ac' ? 2.5 : (layerName === 'pc' ? 3.5 : 3),
+                        color: highlightColor,
+                        opacity: 1,
+                        fill: true,
+                        fillColor: 'transparent',
+                        fillOpacity: 0
+                    });
+                }
             }
             if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
                 layer.bringToFront();
@@ -1166,7 +1799,23 @@
                     });
                 }
             } else {
-                layerGroup.resetStyle(layer);
+                if (layerName === 'ac' && assemblyColoringEnabled) {
+                    const props = layer.feature.properties;
+                    const acNo = props.AC_NO || props.ac_no || "";
+                    const result = typeof assemblyElectionResults !== 'undefined' ? assemblyElectionResults[acNo] : null;
+                    const color = result ? getPartyColor(result.winner_party) : 'transparent';
+                    
+                    layer.setStyle({
+                        fill: true,
+                        fillColor: color,
+                        fillOpacity: 0.5,
+                        weight: 1.5,
+                        color: '#be123c',
+                        opacity: 0.8
+                    });
+                } else {
+                    layerGroup.resetStyle(layer);
+                }
             }
         }
 
@@ -1215,10 +1864,14 @@
                 const acNo = props.AC_NO || props.ac_no || "";
                 const distName = props.DIST_NAME || props.dist_name || "";
                 
+                const result = typeof assemblyElectionResults !== 'undefined' ? assemblyElectionResults[acNo] : null;
+                const winnerInfo = result ? `<div style="font-size:11px; font-weight:700; color:#be123c; margin-top:4px; border-top:1px solid #e2e8f0; padding-top:4px;">Winner: ${result.winner_name} (${getPartyShortName(result.winner_party)})</div>` : "";
+                
                 layer.bindTooltip(`
                     <div style="font-family:'Outfit',sans-serif; padding:2px 4px;">
                         <div style="font-weight:700; font-size:12px; color:#be123c;">${acName} (AC No. ${acNo})</div>
                         <div style="font-size:10px; color:#475569; margin-top:2px;">District: ${distName}</div>
+                        ${winnerInfo}
                     </div>
                 `, { sticky: true, className: 'ulb-hover-tooltip' });
                 
@@ -1228,6 +1881,11 @@
                     },
                     mouseout: function(e) {
                         resetAdminFeatureHighlight(e, 'ac', assemblyLayer);
+                    },
+                    click: function(e) {
+                        if (currentMode === 'election') {
+                            showAssemblyDetailedResult(feature, layer);
+                        }
                     }
                 });
             }
@@ -1297,7 +1955,10 @@
             }
         });
 
+        const localBodyLayerGroup = L.layerGroup([]).addTo(map);
+
         const overlayMaps = {
+            "🏙️ Local Body Results": localBodyLayerGroup,
             "📍 District Boundaries": districtLayer,
             "🏢 Organizational Districts": odLayer,
             "🗳️ Assembly Constituencies": assemblyLayer,
@@ -1305,7 +1966,7 @@
         };
 
         // Add Layer Control to top right with both base maps and overlays
-        L.control.layers(baseMaps, overlayMaps, { collapsed: false, position: 'topright' }).addTo(map);
+        const layerControl = L.control.layers(baseMaps, overlayMaps, { collapsed: false, position: 'topright' }).addTo(map);
 
         // ==========================================
         // PUNJAB STATE BOUNDARY OUTLINE
@@ -1343,6 +2004,200 @@
         let selectedCaste = "__ALL__"; // "__ALL__" for overview, or a specific caste name
         let activeCategoryFilter = "ALL"; // "ALL", "GEN", "OBC", "SC", "MIN", "Others"
         let choroplethFillEnabled = false; // Whether to show color fill on caste boundaries
+        let assemblyColoringEnabled = false; // Whether to show color fill on assembly constituencies based on election results
+
+        // ==========================================
+        // ROUTE PLANNER STATE VARIABLES
+        // ==========================================
+        const boundaryLayers = {
+            assembly: L.layerGroup([]),
+            parliament: L.layerGroup([]),
+            district: L.layerGroup([]),
+            org_district: L.layerGroup([])
+        };
+
+        const boundaryConfigs = {
+            assembly: {
+                title: "🗳️ Assembly Constituencies",
+                panelTitle: "PUNJAB ASSEMBLY MAP",
+                listTitle: "Assembly Seats",
+                dataVar: punjabAssemblyData,
+                getId: (feat) => feat.properties.AC_NO || feat.properties.ac_no,
+                getName: (feat) => feat.properties.AC_NAME || feat.properties.ac_name,
+                getMeta: (feat) => `${feat.properties.DIST_NAME || feat.properties.dist_name || 'Unknown'} District / PC: ${feat.properties.PC_NAME || feat.properties.pc_name || 'Unknown'}`,
+                getPopup: (feat, isInRoute, addFnName, removeFnName) => {
+                    const id = feat.properties.AC_NO || feat.properties.ac_no;
+                    const name = feat.properties.AC_NAME || feat.properties.ac_name;
+                    const distName = feat.properties.DIST_NAME || feat.properties.dist_name || 'Unknown';
+                    const pcName = feat.properties.PC_NAME || feat.properties.pc_name || 'Unknown';
+                    return `
+                        <div style="font-family:'Plus Jakarta Sans',sans-serif; min-width: 180px;">
+                            <div class="popup-header-box">
+                                <span class="popup-title-text">${name}</span>
+                                <span style="font-size: 10px; font-weight:700; color:#fff; background:var(--color-assembly); padding:2px 6px; border-radius:10px;">AC ${id}</span>
+                            </div>
+                            <div class="popup-info-grid">
+                                <div class="popup-row">
+                                    <span class="popup-label">District</span>
+                                    <span class="popup-value">${distName}</span>
+                                </div>
+                                <div class="popup-row">
+                                    <span class="popup-label">Parliamentary Seat</span>
+                                    <span class="popup-value">${pcName}</span>
+                                </div>
+                            </div>
+                            <div class="popup-actions">
+                                ${isInRoute 
+                                    ? `<button class="popup-btn popup-btn-remove" onclick="event.stopPropagation(); ${removeFnName}('${id}')"><i class="fa-solid fa-minus"></i> Remove</button>`
+                                    : `<button class="popup-btn popup-btn-add" onclick="event.stopPropagation(); ${addFnName}('${id}')"><i class="fa-solid fa-plus"></i> Add to Route</button>`
+                                }
+                            </div>
+                        </div>
+                    `;
+                },
+                tooltipText: (feat) => `${feat.properties.AC_NAME || feat.properties.ac_name} (AC No. ${feat.properties.AC_NO || feat.properties.ac_no})`,
+                storageKey: "punjab_saved_routes_assembly",
+                colorVar: "--color-assembly",
+                colorVal: "#ea580c"
+            },
+            parliament: {
+                title: "🏛️ Parliamentary Constituencies",
+                panelTitle: "PUNJAB PARLIAMENTARY MAP",
+                listTitle: "Parliamentary Seats",
+                dataVar: punjabParliamentData,
+                getId: (feat) => feat.properties.PC_NO,
+                getName: (feat) => feat.properties.PC_NAME,
+                getMeta: (feat) => `State: Punjab`,
+                getPopup: (feat, isInRoute, addFnName, removeFnName) => {
+                    const id = feat.properties.PC_NO;
+                    const name = feat.properties.PC_NAME;
+                    return `
+                        <div style="font-family:'Plus Jakarta Sans',sans-serif; min-width: 180px;">
+                            <div class="popup-header-box">
+                                <span class="popup-title-text">${name}</span>
+                                <span style="font-size: 10px; font-weight:700; color:#fff; background:var(--color-assembly); padding:2px 6px; border-radius:10px;">PC ${id}</span>
+                            </div>
+                            <div class="popup-info-grid">
+                                <div class="popup-row">
+                                    <span class="popup-label">State</span>
+                                    <span class="popup-value">${feat.properties.ST_NAME || 'PUNJAB'}</span>
+                                </div>
+                            </div>
+                            <div class="popup-actions">
+                                ${isInRoute 
+                                    ? `<button class="popup-btn popup-btn-remove" onclick="event.stopPropagation(); ${removeFnName}('${id}')"><i class="fa-solid fa-minus"></i> Remove</button>`
+                                    : `<button class="popup-btn popup-btn-add" onclick="event.stopPropagation(); ${addFnName}('${id}')"><i class="fa-solid fa-plus"></i> Add to Route</button>`
+                                }
+                            </div>
+                        </div>
+                    `;
+                },
+                tooltipText: (feat) => `${feat.properties.PC_NAME} (PC No. ${feat.properties.PC_NO})`,
+                storageKey: "punjab_saved_routes_parliament",
+                colorVar: "--color-assembly",
+                colorVal: "#8b5cf6"
+            },
+            district: {
+                title: "📍 District Boundaries",
+                panelTitle: "PUNJAB DISTRICT MAP",
+                listTitle: "Districts",
+                dataVar: punjabDistrictData,
+                getId: (feat) => feat.properties.Dist_Name,
+                getName: (feat) => feat.properties.Dist_Name,
+                getMeta: (feat) => `Code: ${feat.properties.Dist_Code || 'Unknown'}`,
+                getPopup: (feat, isInRoute, addFnName, removeFnName) => {
+                    const id = feat.properties.Dist_Name;
+                    const name = feat.properties.Dist_Name;
+                    return `
+                        <div style="font-family:'Plus Jakarta Sans',sans-serif; min-width: 180px;">
+                            <div class="popup-header-box">
+                                <span class="popup-title-text">${name}</span>
+                                <span style="font-size: 10px; font-weight:700; color:#fff; background:var(--color-assembly); padding:2px 6px; border-radius:10px;">District</span>
+                            </div>
+                            <div class="popup-info-grid">
+                                <div class="popup-row">
+                                    <span class="popup-label">District Code</span>
+                                    <span class="popup-value">${feat.properties.Dist_Code || 'Unknown'}</span>
+                                </div>
+                            </div>
+                            <div class="popup-actions">
+                                ${isInRoute 
+                                    ? `<button class="popup-btn popup-btn-remove" onclick="event.stopPropagation(); ${removeFnName}('${id}')"><i class="fa-solid fa-minus"></i> Remove</button>`
+                                    : `<button class="popup-btn popup-btn-add" onclick="event.stopPropagation(); ${addFnName}('${id}')"><i class="fa-solid fa-plus"></i> Add to Route</button>`
+                                }
+                            </div>
+                        </div>
+                    `;
+                },
+                tooltipText: (feat) => `${feat.properties.Dist_Name} District`,
+                storageKey: "punjab_saved_routes_district",
+                colorVar: "--color-assembly",
+                colorVal: "#06b6d4"
+            },
+            org_district: {
+                title: "🏢 Organizational Districts",
+                panelTitle: "PUNJAB ORGANISATIONAL DISTRICT MAP",
+                listTitle: "Org Districts",
+                dataVar: punjabODData,
+                getId: (feat) => feat.properties.name,
+                getName: (feat) => feat.properties.name,
+                getMeta: (feat) => `Total ACs: ${feat.properties.total_acs || 0}`,
+                getPopup: (feat, isInRoute, addFnName, removeFnName) => {
+                    const id = feat.properties.name;
+                    const name = feat.properties.name;
+                    return `
+                        <div style="font-family:'Plus Jakarta Sans',sans-serif; min-width: 180px;">
+                            <div class="popup-header-box">
+                                <span class="popup-title-text">${name}</span>
+                                <span style="font-size: 10px; font-weight:700; color:#fff; background:var(--color-assembly); padding:2px 6px; border-radius:10px;">Org District</span>
+                            </div>
+                            <div class="popup-info-grid">
+                                <div class="popup-row">
+                                    <span class="popup-label">Total Assembly Seats</span>
+                                    <span class="popup-value">${feat.properties.total_acs || 0}</span>
+                                </div>
+                            </div>
+                            <div class="popup-actions">
+                                ${isInRoute 
+                                    ? `<button class="popup-btn popup-btn-remove" onclick="event.stopPropagation(); ${removeFnName}('${id}')"><i class="fa-solid fa-minus"></i> Remove</button>`
+                                    : `<button class="popup-btn popup-btn-add" onclick="event.stopPropagation(); ${addFnName}('${id}')"><i class="fa-solid fa-plus"></i> Add to Route</button>`
+                                }
+                            </div>
+                        </div>
+                    `;
+                },
+                tooltipText: (feat) => `${feat.properties.name} Org District`,
+                storageKey: "punjab_saved_routes_od",
+                colorVar: "--color-assembly",
+                colorVal: "#ec4899"
+            }
+        };
+
+        let routeLayerControl = null;
+        let routeStateBoundaryLayer = null;
+        let currentBoundaryType = 'assembly';
+        let assemblyLayers = {};     // Map boundary IDs to Leaflet layers
+        let assemblyDataList = [];   // List of boundary objects for searching
+        let selectedAcNo = null;     // Selected Boundary ID
+        let routePoints = [];        // List of boundary objects in route
+        let routeModeActive = false; // Whether clicking on map adds to route
+        let routePolyline = null;    // Route line layer
+        let routeMarkers = [];       // Route numbered pin markers
+        let routeFocusActive = false; // Whether to hide non-route constituencies
+        let routeColor = '#2563eb';  // Custom color chosen for the active route
+        let borderColor = '#ea580c'; // Custom color for constituency borders
+        let borderWeight = 1.5;      // Custom thickness for constituency borders
+        let fillColor = '#f97316';   // Custom fill color for route constituencies
+        let fillOpacity = 0.12;      // Fill transparency (0 = fully transparent, 1 = opaque)
+        let inverseFillActive = false; // "Color Rest" mode toggle
+        let savedRoutes = [];        // Saved campaign routes
+        let activeRouteIdx = null;
+        let activeRouteIndices = new Set();   // Currently selected route index
+        let allSavedRoutesLayer = null; // Layer group to display all saved routes concurrently
+        let routeBoundaryNameLabels = []; // Leaflet tooltip labels on map for route planner
+        let routeBoundaryLabelsVisible = false; // Visibility state of constituency names for route planner
+        let insertCursorIndex = null;
+        let draggedItemIndex = null;
 
         function filterCasteDropdown(cat) {
             activeCategoryFilter = cat;
@@ -1404,11 +2259,35 @@
             document.querySelectorAll(".mode-dropdown-item").forEach(item => {
                 item.classList.remove("active");
             });
+
+            // Toggle sidebars
+            if (mode === "route") {
+                document.getElementById("election-caste-sidebar").style.display = "none";
+                document.getElementById("route-planner-sidebar").style.display = "flex";
+                
+                // Hide default Leaflet layer control container
+                const lcContainer = document.querySelector(".leaflet-control-layers");
+                if (lcContainer) lcContainer.style.display = "none";
+            } else {
+                document.getElementById("route-planner-sidebar").style.display = "none";
+                document.getElementById("election-caste-sidebar").style.display = "flex";
+                
+                // Show default Leaflet layer control container
+                const lcContainer = document.querySelector(".leaflet-control-layers");
+                if (lcContainer) lcContainer.style.display = "block";
+            }
             
             if (mode === "election") {
                 document.getElementById("mode-item-election").classList.add("active");
                 document.getElementById("active-mode-label").innerText = "Punjab Civic Polls - Results 2026";
                 document.getElementById("caste-filter-container").style.display = "none";
+                
+                // Restore local body overlay option to layerControl
+                if (typeof layerControl !== 'undefined') {
+                    layerControl.removeLayer(localBodyLayerGroup);
+                    layerControl.addOverlay(localBodyLayerGroup, "🏙️ Local Body Results");
+                }
+                localBodyLayerGroup.addTo(map);
                 
                 // Clear boundary name labels from caste mode
                 clearBoundaryNameLabels();
@@ -1426,27 +2305,35 @@
                 map.removeLayer(parliamentLayer);
                 map.removeLayer(odLayer);
                 
+                // Remove route planner controls/layers from map
+                cleanupRoutePlannerMapLayers();
+                
                 // Mount standard election view
                 if (currentView === "city" && selectedCityFeature) {
                     drilldownToCity(selectedCityFeature);
                 } else {
                     mountStateView();
                 }
-            } else {
+                updateBoundaryLabelsIfNeeded();
+            } else if (mode === "caste") {
                 document.getElementById("mode-item-caste").classList.add("active");
                 document.getElementById("active-mode-label").innerText = "Punjab Caste Based Mapping";
                 document.getElementById("caste-filter-container").style.display = "block";
+                
+                // Hide local body overlay option from layerControl in Caste Mode
+                if (typeof layerControl !== 'undefined') {
+                    layerControl.removeLayer(localBodyLayerGroup);
+                }
+                map.removeLayer(localBodyLayerGroup);
                 
                 // Change brand name to reflect Caste Mapping
                 document.querySelector(".brand-title").innerText = "Punjab Caste Map";
                 document.querySelector(".brand-subtitle").innerText = "Demographic Data Explorer";
                 
-                // Remove election layers (ULBs and Wards)
-                if (ulbLayer) map.removeLayer(ulbLayer);
-                if (wardLayer) {
-                    map.removeLayer(wardLayer);
-                    wardLayer = null;
-                }
+                // Remove election layers (ULBs and Wards via group)
+                localBodyLayerGroup.clearLayers();
+                ulbLayer = null;
+                wardLayer = null;
                 clearWardLabels();
                 document.getElementById("city-header-overlay").style.display = "none";
                 document.getElementById("navigation-banner").style.display = "none";
@@ -1454,8 +2341,35 @@
                 // Populate caste select dropdown if not already populated
                 populateCasteDropdown();
                 
+                // Remove route planner controls/layers from map
+                cleanupRoutePlannerMapLayers();
+
                 // Activate default caste layer
                 setActiveCasteLayer(activeCasteLayer);
+            } else if (mode === "route") {
+                document.getElementById("mode-item-route").classList.add("active");
+                document.getElementById("active-mode-label").innerText = "Punjab Campaign Route Planner";
+                
+                // Hide caste filters and other controls
+                document.getElementById("caste-filter-container").style.display = "none";
+                document.getElementById("city-header-overlay").style.display = "none";
+                document.getElementById("navigation-banner").style.display = "none";
+                
+                // Clear election layers
+                localBodyLayerGroup.clearLayers();
+                ulbLayer = null;
+                wardLayer = null;
+                clearWardLabels();
+                
+                // Remove election administrative layers
+                map.removeLayer(districtLayer);
+                map.removeLayer(assemblyLayer);
+                map.removeLayer(parliamentLayer);
+                map.removeLayer(odLayer);
+                clearBoundaryNameLabels();
+                
+                // Show route overlays & init route layer control
+                initRoutePlannerLayersOnMap();
             }
         }
 
@@ -1493,13 +2407,24 @@
                 const acName = props.AC_NAME || props.ac_name || "Unknown";
                 const acNo = props.AC_NO || props.ac_no || "";
                 const distName = props.DIST_NAME || props.dist_name || "";
+                
+                const result = typeof assemblyElectionResults !== 'undefined' ? assemblyElectionResults[acNo] : null;
+                const winnerInfo = result ? `<div style="font-size:11px; font-weight:700; color:#be123c; margin-top:4px; border-top:1px solid #e2e8f0; padding-top:4px;">Winner: ${result.winner_name} (${getPartyShortName(result.winner_party)})</div>` : "";
+                
                 l.bindTooltip(`
                     <div style="font-family:'Outfit',sans-serif; padding:2px 4px;">
                         <div style="font-weight:700; font-size:12px; color:#be123c;">${acName} (AC No. ${acNo})</div>
                         <div style="font-size:10px; color:#475569; margin-top:2px;">District: ${distName}</div>
+                        ${winnerInfo}
                     </div>
                 `, { sticky: true, className: 'ulb-hover-tooltip' });
+                
                 l.off('click');
+                l.on('click', function() {
+                    if (currentMode === 'election') {
+                        showAssemblyDetailedResult(l.feature, l);
+                    }
+                });
             });
 
             parliamentLayer.setStyle({
@@ -1600,7 +2525,7 @@
             }
         }
 
-        // Hook Leaflet Overlay Control Adds in Caste Mode
+        // Hook Leaflet Overlay Control Adds
         map.on('overlayadd', function (e) {
             if (currentMode === 'caste') {
                 let newLayerName = null;
@@ -1612,6 +2537,50 @@
                 if (newLayerName && newLayerName !== activeCasteLayer) {
                     setActiveCasteLayer(newLayerName);
                 }
+            } else if (currentMode === 'route') {
+                if (isSwitchingBoundary) return;
+                let newBoundaryType = null;
+                if (e.layer === assemblyLayer) newBoundaryType = 'assembly';
+                else if (e.layer === parliamentLayer) newBoundaryType = 'parliament';
+                else if (e.layer === districtLayer) newBoundaryType = 'district';
+                else if (e.layer === odLayer) newBoundaryType = 'org_district';
+                
+                if (newBoundaryType && newBoundaryType !== currentBoundaryType) {
+                    switchBoundary(newBoundaryType);
+                }
+            } else {
+                updateLegend();
+                if (e.layer === assemblyLayer) {
+                    updateAssemblyLayerStyle();
+                }
+                if (e.layer === localBodyLayerGroup) {
+                    restoreWardLabelsToMap();
+                }
+                updateBoundaryLabelsIfNeeded();
+            }
+        });
+
+        map.on('overlayremove', function (e) {
+            if (currentMode === 'route') {
+                if (isSwitchingBoundary) return;
+                let removedType = null;
+                if (e.layer === assemblyLayer) removedType = 'assembly';
+                else if (e.layer === parliamentLayer) removedType = 'parliament';
+                else if (e.layer === districtLayer) removedType = 'district';
+                else if (e.layer === odLayer) removedType = 'org_district';
+                
+                if (removedType && removedType === currentBoundaryType) {
+                    clearRouteBoundaryNameLabels();
+                    activeLayerGroup = null;
+                    selectedAcNo = null;
+                    selectConstituency(null, false);
+                }
+            } else if (currentMode !== 'caste') {
+                updateLegend();
+                if (e.layer === localBodyLayerGroup) {
+                    clearWardLabelsFromMap();
+                }
+                updateBoundaryLabelsIfNeeded();
             }
         });
 
@@ -2213,8 +3182,38 @@
             } else {
                 const legendDiv = document.querySelector('.map-legend');
                 if (legendDiv) {
+                    const isAssemblyActive = map.hasLayer(assemblyLayer);
+                    
+                    let toggleButtonHtml = "";
+                    if (isAssemblyActive) {
+                        const iconClass = assemblyColoringEnabled ? "fa-eye" : "fa-eye-slash";
+                        const btnText = assemblyColoringEnabled ? "Coloring: ON" : "Coloring: OFF";
+                        const btnBg = assemblyColoringEnabled ? "#be123c" : "rgba(190, 18, 60, 0.1)";
+                        const btnColor = assemblyColoringEnabled ? "#ffffff" : "#be123c";
+                        const btnBorder = assemblyColoringEnabled ? "#be123c" : "rgba(190, 18, 60, 0.25)";
+                        
+                        toggleButtonHtml = `
+                            <div style="margin: 6px 0 8px 0;">
+                                <button onclick="toggleAssemblyColoring(event)" style="
+                                    display: inline-flex; align-items: center; gap: 5px;
+                                    background: ${btnBg}; color: ${btnColor};
+                                    border: 1px solid ${btnBorder}; border-radius: 6px;
+                                    padding: 4px 10px; font-family: 'Outfit', sans-serif;
+                                    font-size: 10px; font-weight: 600; cursor: pointer;
+                                    transition: all 0.2s ease; width: 100%;
+                                    justify-content: center;
+                                    outline: none;
+                                ">
+                                    <i class="fa-solid ${iconClass}" style="font-size: 9px;"></i>
+                                    ${btnText}
+                                </button>
+                            </div>
+                        `;
+                    }
+
                     legendDiv.innerHTML = `
                         <div class="legend-title">Party Legend</div>
+                        ${toggleButtonHtml}
                         <div class="legend-row"><div class="legend-color" style="background: #0288d1"></div><span>AAP</span></div>
                         <div class="legend-row"><div class="legend-color" style="background: #2e7d32"></div><span>INC</span></div>
                         <div class="legend-row"><div class="legend-color" style="background: #f57c00"></div><span>SAD</span></div>
@@ -2224,6 +3223,47 @@
                         <div class="legend-row"><div class="legend-color" style="background: #757575"></div><span>Tie / Coalition</span></div>
                     `;
                 }
+            }
+        }
+
+        function toggleAssemblyColoring(event) {
+            if (event) {
+                event.stopPropagation();
+                event.preventDefault();
+            }
+            assemblyColoringEnabled = !assemblyColoringEnabled;
+            updateAssemblyLayerStyle();
+            updateLegend();
+        }
+
+        function updateAssemblyLayerStyle() {
+            if (currentMode === 'election') {
+                assemblyLayer.eachLayer(l => {
+                    const props = l.feature.properties;
+                    const acNo = props.AC_NO || props.ac_no || "";
+                    const result = typeof assemblyElectionResults !== 'undefined' ? assemblyElectionResults[acNo] : null;
+                    
+                    if (assemblyColoringEnabled && result) {
+                        const color = getPartyColor(result.winner_party);
+                        l.setStyle({
+                            fill: true,
+                            fillColor: color,
+                            fillOpacity: 0.5,
+                            weight: 1.5,
+                            color: '#be123c',
+                            opacity: 0.8
+                        });
+                    } else {
+                        l.setStyle({
+                            fill: true,
+                            fillColor: 'transparent',
+                            fillOpacity: 0,
+                            weight: 1.5,
+                            color: '#be123c',
+                            opacity: 0.8
+                        });
+                    }
+                });
             }
         }
 
@@ -2492,18 +3532,103 @@
         };
 
         function getPartyColor(partyName) {
-            return partyColors[partyName] || "#757575";
+            if (!partyName) return "#757575";
+            if (partyColors[partyName]) return partyColors[partyName];
+            const p = partyName.toUpperCase();
+            if (p.includes("AAM AADMI") || p === "AAP" || p === "AAAP") return "#0288d1";
+            if (p.includes("CONGRESS") || p === "INC") return "#2e7d32";
+            if (p.includes("AKALI") || p === "SAD") return "#f57c00";
+            if (p.includes("BHARATIYA") || p === "BJP") return "#e65100";
+            if (p.includes("INDEPENDENT") || p === "IND") return "#546e7a";
+            if (p.includes("BAHUJAN") || p === "BSP") return "#1a237e";
+            return "#757575";
+        }
+
+        function showAssemblyDetailedResult(feature, layer) {
+            const props = feature.properties;
+            const acNo = props.AC_NO || props.ac_no || "";
+            const result = typeof assemblyElectionResults !== 'undefined' ? assemblyElectionResults[acNo] : null;
+            if (!result) {
+                layer.bindPopup(`
+                    <div style="font-family:'Outfit',sans-serif; padding:10px;">
+                        <div style="font-weight:700; font-size:14px; color:#be123c;">${props.AC_NAME || "Assembly Constituency"}</div>
+                        <div style="font-size:11px; color:#64748b; margin-top:4px;">Detailed result not found for AC No. ${acNo}</div>
+                    </div>
+                `, { closeButton: true }).openPopup();
+                return;
+            }
+            
+            // Build candidate rows
+            let candidatesHtml = result.candidates.map((cand, idx) => {
+                const badgeClass = getPartyBadgeClass(cand.party);
+                const isWinner = idx === 0;
+                return `
+                    <div class="caste-breakdown-row" style="margin-bottom: 6px; display: flex; flex-direction: column; gap: 2px;">
+                        <div class="caste-breakdown-labels" style="display: flex; justify-content: space-between; font-size: 11px; font-weight: 600;">
+                            <span>
+                                ${isWinner ? '👑 ' : ''}${cand.name}
+                                <span class="party-badge ${badgeClass}" style="font-size: 8px; padding: 1px 4px; margin-left: 4px;">${getPartyShortName(cand.party)}</span>
+                            </span>
+                            <span style="font-weight:800;">${cand.total.toLocaleString()} (${cand.percent.toFixed(2)}%)</span>
+                        </div>
+                        <div class="caste-breakdown-bar-bg" style="background: #e2e8f0; height: 5px; border-radius: 3px; overflow: hidden; width: 100%;">
+                            <div class="caste-breakdown-bar" style="width: ${Math.min(cand.percent, 100)}%; background: ${getPartyColor(cand.party)}; height: 100%; border-radius: 3px;"></div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            const marginText = result.margin === 0 ? "Un-Opposed" : result.margin.toLocaleString() + " Votes";
+            const turnoutPercent = result.turnout_percent ? result.turnout_percent + "%" : "N/A";
+
+            const popupContent = `
+                <div class="popup-header-box" style="border-bottom: 1px solid var(--border-light); padding-bottom: 8px; margin-bottom: 8px;">
+                    <div>
+                        <span class="popup-title-text" style="font-size: 15px; color: #be123c;">${result.ac_name}</span>
+                        <span style="font-size: 11px; color: var(--text-secondary); margin-left: 6px;">(AC No. ${result.ac_no})</span>
+                    </div>
+                    <span class="party-badge ${getPartyBadgeClass(result.winner_party)}" style="font-size: 9px;">${getPartyShortName(result.winner_party)} Win</span>
+                </div>
+                
+                <div class="popup-info-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin-bottom: 10px; border-bottom: 1px solid var(--border-light); padding-bottom: 8px;">
+                    <div class="popup-card">
+                        <span class="popup-lbl" style="font-size: 8px;">Winner</span>
+                        <span class="popup-val-text" style="font-size: 11px; font-weight:700;">${result.winner_name}</span>
+                    </div>
+                    <div class="popup-card">
+                        <span class="popup-lbl" style="font-size: 8px;">Margin</span>
+                        <span class="popup-val-text" style="font-size: 11px; font-weight:700;">${marginText}</span>
+                    </div>
+                    <div class="popup-card">
+                        <span class="popup-lbl" style="font-size: 8px;">Total Electors</span>
+                        <span class="popup-val-text" style="font-size: 11px; font-weight:700;">${result.total_electors.toLocaleString()}</span>
+                    </div>
+                    <div class="popup-card">
+                        <span class="popup-lbl" style="font-size: 8px;">Turnout</span>
+                        <span class="popup-val-text" style="font-size: 11px; font-weight:700;">${turnoutPercent}</span>
+                    </div>
+                </div>
+                
+                <div style="font-size: 9px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px; letter-spacing: 0.5px;">
+                    Candidate Breakdown
+                </div>
+                <div class="caste-breakdown-container" style="max-height: 180px; overflow-y: auto; padding-right: 4px;">
+                    ${candidatesHtml}
+                </div>
+            `;
+
+            layer.bindPopup(popupContent, { closeButton: true, minWidth: 290, maxHeight: 400 }).openPopup();
         }
 
         function getPartyBadgeClass(partyName) {
             if (!partyName) return "coalition";
             const p = partyName.toUpperCase();
-            if (p.includes("AAM AADMI")) return "aap";
-            if (p.includes("CONGRESS")) return "inc";
-            if (p.includes("AKALI")) return "sad";
-            if (p.includes("BHARATIYA")) return "bjp";
-            if (p.includes("INDEPENDENT")) return "ind";
-            if (p.includes("BAHUJAN")) return "bsp";
+            if (p.includes("AAM AADMI") || p === "AAP" || p === "AAAP") return "aap";
+            if (p.includes("CONGRESS") || p === "INC") return "inc";
+            if (p.includes("AKALI") || p === "SAD") return "sad";
+            if (p.includes("BHARATIYA") || p === "BJP") return "bjp";
+            if (p.includes("INDEPENDENT") || p === "IND") return "ind";
+            if (p.includes("BAHUJAN") || p === "BSP") return "bsp";
             return "coalition";
         }
 
@@ -2590,17 +3715,11 @@
             document.getElementById("search-input").value = "";
             document.getElementById("list-title-label").innerText = "Elected Cities";
 
-            // Clear Wards Layer and Labels from map
-            if (wardLayer) {
-                map.removeLayer(wardLayer);
-                wardLayer = null;
-            }
+            // Clear local body layers and labels
+            localBodyLayerGroup.clearLayers();
+            wardLayer = null;
+            ulbLayer = null;
             clearWardLabels();
-
-            // Mount ULB Layer
-            if (ulbLayer) {
-                map.removeLayer(ulbLayer);
-            }
 
             ulbLayer = L.geoJSON(electionUlbsData, {
                 pane: 'localBodyPane',
@@ -2623,7 +3742,8 @@
                         }
                     });
                 }
-            }).addTo(map);
+            });
+            localBodyLayerGroup.addLayer(ulbLayer);
 
             // Zoom map out to encompass all cities
             map.fitBounds(ulbLayer.getBounds(), { padding: [30, 30] });
@@ -2788,7 +3908,10 @@
             // Clear previous ward labels
             clearWardLabels();
 
-            // Add Ward Layer to map
+            // Clear local body layers and add wardLayer to localBodyLayerGroup
+            localBodyLayerGroup.clearLayers();
+            ulbLayer = null;
+
             wardLayer = L.geoJSON(cityWards, {
                 pane: 'localBodyPane',
                 style: styleWardFeature,
@@ -2811,10 +3934,13 @@
                     });
                     label.setContent('W' + wardNo);
                     label.setLatLng(center);
-                    label.addTo(map);
+                    if (map.hasLayer(localBodyLayerGroup)) {
+                        label.addTo(map);
+                    }
                     wardLabels.push(label);
                 }
-            }).addTo(map);
+            });
+            localBodyLayerGroup.addLayer(wardLayer);
 
             // Zoom specifically to this city's ward layout
             map.fitBounds(wardLayer.getBounds(), {
@@ -3002,7 +4128,7 @@
                     const p = feat.properties;
                     const wardNum = parseInt(p.ward_no);
                     const itemDiv = document.createElement("div");
-                    itemDiv.className = "list-item" + (map.hasLayer(wardLayer) && wardLayer.getLayers().find(l => l.feature.properties.objectid === p.objectid && l.isPopupOpen()) ? " active" : "");
+                    itemDiv.className = "list-item" + (map.hasLayer(localBodyLayerGroup) && wardLayer && localBodyLayerGroup.hasLayer(wardLayer) && wardLayer.getLayers().find(l => l.feature.properties.objectid === p.objectid && l.isPopupOpen()) ? " active" : "");
                     itemDiv.id = `item-${p.objectid}`;
                     itemDiv.innerHTML = `
                         <div class="item-header">
@@ -3036,6 +4162,16 @@
             wardLabels = [];
         }
 
+        function clearWardLabelsFromMap() {
+            wardLabels.forEach(label => map.removeLayer(label));
+        }
+
+        function restoreWardLabelsToMap() {
+            if (currentView === 'city' && wardLayer) {
+                wardLabels.forEach(label => label.addTo(map));
+            }
+        }
+
         // ==========================================
         // BOUNDARY NAME LABELS (Clean View + Caste Mode)
         // ==========================================
@@ -3049,16 +4185,27 @@
 
         function addBoundaryNameLabels(layerName, layer) {
             clearBoundaryNameLabels();
+            const allRouteAcNos = (currentMode === 'route') ? getAllActiveRouteAcNos() : null;
             layer.eachLayer(l => {
                 const name = getFeatureName(layerName, l.feature);
                 if (!name || name === 'Unknown') return;
                 
-                // Skip adding label if the range visibility is turned off
-                const pct = getCastePercentage(layerName, l.feature, selectedCaste);
-                const rangeKey = getRangeKeyForPercentage(pct);
-                if (window.hiddenNamesByRange[rangeKey]) return;
+                if (currentMode === 'caste') {
+                    // Skip adding label if the range visibility is turned off
+                    const pct = getCastePercentage(layerName, l.feature, selectedCaste);
+                    const rangeKey = getRangeKeyForPercentage(pct);
+                    if (window.hiddenNamesByRange[rangeKey]) return;
+                } else if (currentMode === 'route') {
+                    // In route planner mode, if focus mode is active, only show labels for constituencies in any active route
+                    const config = boundaryConfigs[currentBoundaryType];
+                    const acNo = config.getId(l.feature);
+                    if (routeFocusActive && allRouteAcNos && !allRouteAcNos.has(acNo)) {
+                        return;
+                    }
+                }
 
-                const center = l.getBounds().getCenter();
+                // POI visual center calculation (use visual center to prevent labels outside bounds)
+                const center = getVisualCenter(l.feature, l);
                 const label = L.tooltip({
                     permanent: true,
                     direction: 'center',
@@ -3075,10 +4222,9 @@
 
         function updateBoundaryLabelsIfNeeded() {
             const btn = document.getElementById('toggle-names-btn');
-            // Show/hide the toggle button: visible in caste mode on any base map
+            
             if (currentMode === 'caste') {
                 btn.style.display = 'inline-flex';
-                // If labels are toggled ON, refresh them (e.g. when switching boundary layer)
                 if (boundaryLabelsVisible) {
                     let activeLayer = null;
                     if (activeCasteLayer === 'district') activeLayer = districtLayer;
@@ -3091,13 +4237,52 @@
                 } else {
                     clearBoundaryNameLabels();
                 }
+            } else if (currentMode === 'election') {
+                let activeLayerName = null;
+                let activeLayer = null;
+                if (map.hasLayer(assemblyLayer)) {
+                    activeLayerName = 'ac';
+                    activeLayer = assemblyLayer;
+                } else if (map.hasLayer(districtLayer)) {
+                    activeLayerName = 'district';
+                    activeLayer = districtLayer;
+                } else if (map.hasLayer(parliamentLayer)) {
+                    activeLayerName = 'pc';
+                    activeLayer = parliamentLayer;
+                } else if (map.hasLayer(odLayer)) {
+                    activeLayerName = 'od';
+                    activeLayer = odLayer;
+                }
+                
+                if (activeLayer) {
+                    btn.style.display = 'inline-flex';
+                    if (boundaryLabelsVisible) {
+                        addBoundaryNameLabels(activeLayerName, activeLayer);
+                    } else {
+                        clearBoundaryNameLabels();
+                    }
+                } else {
+                    btn.style.display = 'none';
+                    clearBoundaryNameLabels();
+                }
+            } else if (currentMode === 'route') {
+                btn.style.display = 'inline-flex';
+                if (boundaryLabelsVisible) {
+                    let layerName = 'ac';
+                    if (currentBoundaryType === 'assembly') layerName = 'ac';
+                    else if (currentBoundaryType === 'parliament') layerName = 'pc';
+                    else if (currentBoundaryType === 'district') layerName = 'district';
+                    else if (currentBoundaryType === 'org_district') layerName = 'od';
+                    
+                    if (activeLayerGroup) {
+                        addBoundaryNameLabels(layerName, activeLayerGroup);
+                    }
+                } else {
+                    clearBoundaryNameLabels();
+                }
             } else {
                 btn.style.display = 'none';
                 clearBoundaryNameLabels();
-                // Reset toggle state when leaving caste mode
-                boundaryLabelsVisible = false;
-                btn.classList.remove('active');
-                btn.innerHTML = '<i class="fa-solid fa-font"></i> Show Names';
             }
         }
 
@@ -3108,19 +4293,11 @@
             if (boundaryLabelsVisible) {
                 btn.classList.add('active');
                 btn.innerHTML = '<i class="fa-solid fa-font"></i> Hide Names';
-                let activeLayer = null;
-                if (activeCasteLayer === 'district') activeLayer = districtLayer;
-                else if (activeCasteLayer === 'ac') activeLayer = assemblyLayer;
-                else if (activeCasteLayer === 'pc') activeLayer = parliamentLayer;
-                else if (activeCasteLayer === 'od') activeLayer = odLayer;
-                if (activeLayer) {
-                    addBoundaryNameLabels(activeCasteLayer, activeLayer);
-                }
             } else {
                 btn.classList.remove('active');
                 btn.innerHTML = '<i class="fa-solid fa-font"></i> Show Names';
-                clearBoundaryNameLabels();
             }
+            updateBoundaryLabelsIfNeeded();
         }
 
         // Listen for base map changes
@@ -3273,208 +4450,1945 @@
         async function downloadPDF() {
             const btn = document.getElementById('download-pdf-btn');
             const originalText = btn.innerHTML;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generating PDF...';
-            btn.classList.add('loading');
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Preparing Print...';
+            
+            // Save current view state
+            const originalCenter = map.getCenter();
+            const originalZoom = map.getZoom();
+            
+            // Enter print mode
+            document.body.classList.add('print-mode');
+            map.invalidateSize();
+            
+            // Determine best bounds to fit for print in index.html
+            let printBounds = null;
+            if (currentMode === 'caste') {
+                if (activeCasteLayer === 'district' && typeof districtLayer !== 'undefined') printBounds = districtLayer.getBounds();
+                else if (activeCasteLayer === 'ac' && typeof assemblyLayer !== 'undefined') printBounds = assemblyLayer.getBounds();
+                else if (activeCasteLayer === 'pc' && typeof parliamentLayer !== 'undefined') printBounds = parliamentLayer.getBounds();
+                else if (activeCasteLayer === 'od' && typeof odLayer !== 'undefined') printBounds = odLayer.getBounds();
+            } else { // election mode
+                if (currentView === 'city' && typeof wardLayer !== 'undefined' && wardLayer) {
+                    printBounds = wardLayer.getBounds();
+                } else if (typeof ulbLayer !== 'undefined' && ulbLayer) {
+                    printBounds = ulbLayer.getBounds();
+                }
+            }
+            
+            // Fit bounds with safety padding (keeps map away from the border edges)
+            if (printBounds) {
+                map.fitBounds(printBounds, { padding: [50, 50], animate: false });
+            } else {
+                if (typeof districtLayer !== 'undefined') {
+                    map.fitBounds(districtLayer.getBounds(), { padding: [50, 50], animate: false });
+                }
+            }
+            
+            // Wait for map to redraw and load tiles in print layout
+            setTimeout(() => {
+                window.print();
+                
+                // Revert to screen view
+                document.body.classList.remove('print-mode');
+                map.invalidateSize();
+                map.setView(originalCenter, originalZoom, { animate: false });
+                btn.innerHTML = originalText;
+            }, 1000);
+        }
+
+        // =================================================================
+        // CAMPAIGN ROUTE PLANNER FUNCTIONS
+        // =================================================================
+        let fillMatchRoute = false;
+        let routeNamesVisible = false;
+        let routeNameLabels = [];
+        let activeRoutePolylines = [];
+
+        function saveRoutesToStorage() {
+            const config = boundaryConfigs[currentBoundaryType];
+            localStorage.setItem(config.storageKey, JSON.stringify(savedRoutes));
+        }
+
+        // Helper: check if an AC is in ANY active route
+        function isAcInAnyActiveRoute(acNo) {
+            // Check current routePoints
+            if (routePoints.some(p => p.acNo == acNo)) return true;
+            // Check all active route indices
+            if (typeof activeRouteIndices !== 'undefined') {
+                for (const idx of activeRouteIndices) {
+                    const r = savedRoutes[idx];
+                    if (r && r.acNos.some(x => x == acNo)) return true;
+                }
+            }
+            return false;
+        }
+
+        // Helper: get the route color for a given AC
+        function getRouteColorForAc(acNo) {
+            if (routePoints.some(p => p.acNo == acNo)) return routeColor;
+            if (typeof activeRouteIndices !== 'undefined') {
+                for (const idx of activeRouteIndices) {
+                    const r = savedRoutes[idx];
+                    if (r && r.acNos.some(x => x == acNo)) return r.color || '#ea580c';
+                }
+            }
+            return routeColor;
+        }
+
+        // Helper: get the fill color for a given AC
+        function getFillColorForAc(acNo) {
+            if (routePoints.some(p => p.acNo == acNo)) {
+                if (activeRouteIdx !== null && savedRoutes[activeRouteIdx]) {
+                    const r = savedRoutes[activeRouteIdx];
+                    if (r.fillMatchRoute) return r.color || routeColor;
+                    return r.fillColor || r.color || routeColor;
+                }
+                if (fillMatchRoute) return routeColor;
+                return fillColor || routeColor;
+            }
+            if (typeof activeRouteIndices !== 'undefined') {
+                for (const idx of activeRouteIndices) {
+                    const r = savedRoutes[idx];
+                    if (r && r.acNos.includes(acNo)) {
+                        if (r.fillMatchRoute) return r.color || '#ea580c';
+                        return r.fillColor || r.color || '#ea580c';
+                    }
+                }
+            }
+            return fillColor || '#f97316';
+        }
+
+        function getACStyle(feature) {
+            const config = boundaryConfigs[currentBoundaryType];
+            const acNo = config.getId(feature);
+            const isSelected = acNo == selectedAcNo;
+            const isInRoute = isAcInAnyActiveRoute(acNo);
+            const hasAnyRoute = routePoints.length > 0 || (typeof activeRouteIndices !== 'undefined' && activeRouteIndices.size > 0);
+
+            if (routeFocusActive && !isInRoute && !isSelected) {
+                // In focus mode: show all borders but no fill, dimmed
+                return {
+                    pane: 'boundaryPane',
+                    fill: false,
+                    stroke: true,
+                    weight: Math.max(0.5, borderWeight * 0.67),
+                    color: borderColor,
+                    opacity: 1,
+                    fillOpacity: 0
+                };
+            }
+
+            const rFillCol = getFillColorForAc(acNo);
+
+            if (routeFocusActive && isInRoute) {
+                // In focus mode: route constituencies highlighted with fill color
+                return {
+                    pane: 'boundaryPane',
+                    fill: true,
+                    fillColor: rFillCol,
+                    fillOpacity: isSelected ? Math.min(1.0, fillOpacity + 0.15) : fillOpacity,
+                    weight: isSelected ? borderWeight + 2 : borderWeight + 1.5,
+                    color: isSelected ? '#f97316' : borderColor,
+                    opacity: 1
+                };
+            }
+
+            // Inverse Fill Mode Logic
+            if (inverseFillActive && !routeFocusActive) {
+                if (hasAnyRoute) {
+                    if (isInRoute) {
+                        return {
+                            pane: 'boundaryPane',
+                            fill: isSelected,
+                            fillColor: isSelected ? 'rgba(234, 88, 12, 0.15)' : 'transparent',
+                            fillOpacity: isSelected ? 1 : 0,
+                            weight: isSelected ? borderWeight + 1.5 : borderWeight + 1,
+                            color: isSelected ? '#f97316' : borderColor,
+                            opacity: 1
+                        };
+                    } else {
+                        return {
+                            pane: 'boundaryPane',
+                            fill: true,
+                            fillColor: hexToRgba(fillColor || '#f97316', fillOpacity),
+                            fillOpacity: 1,
+                            weight: isSelected ? borderWeight + 1.5 : borderWeight,
+                            color: isSelected ? '#f97316' : borderColor,
+                            opacity: 1
+                        };
+                    }
+                } else {
+                    return {
+                        pane: 'boundaryPane',
+                        fill: true,
+                        fillColor: hexToRgba(fillColor || '#f97316', fillOpacity),
+                        fillOpacity: 1,
+                        weight: isSelected ? borderWeight + 1.5 : borderWeight,
+                        color: isSelected ? '#f97316' : borderColor,
+                        opacity: 1
+                    };
+                }
+            }
+
+            return {
+                pane: 'boundaryPane',
+                fill: true,
+                fillColor: isInRoute 
+                    ? hexToRgba(rFillCol, isSelected ? Math.min(1.0, fillOpacity + 0.15) : fillOpacity) 
+                    : (isSelected ? 'rgba(234, 88, 12, 0.15)' : 'transparent'),
+                fillOpacity: 1,
+                weight: isSelected ? borderWeight + 1.5 : (isInRoute ? borderWeight + 1 : borderWeight),
+                color: isSelected 
+                    ? '#f97316' 
+                    : borderColor,
+                opacity: 1
+            };
+        }
+
+        // Highlight AC on mouseover
+        function highlightACFeature(e) {
+            const layer = e.target;
+            const config = boundaryConfigs[currentBoundaryType];
+            const acNo = config.getId(layer.feature);
+            const isInRoute = isAcInAnyActiveRoute(acNo);
+            
+            // Skip highlighting if focus is active and it's not in the route
+            if (routeFocusActive && !isInRoute && acNo != selectedAcNo) {
+                return;
+            }
+
+            if (acNo != selectedAcNo) {
+                layer.setStyle({
+                    weight: borderWeight + 1.5,
+                    color: isInRoute ? getRouteColorForAc(acNo) : '#f97316',
+                    opacity: 1
+                });
+            }
+            if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
+                layer.bringToFront();
+            }
+        }
+
+        // Reset highlight on mouseout
+        function resetACFeatureHighlight(e) {
+            const layer = e.target;
+            const config = boundaryConfigs[currentBoundaryType];
+            const acNo = config.getId(layer.feature);
+            if (acNo != selectedAcNo) {
+                layer.setStyle(getACStyle(layer.feature));
+            }
+        }
+
+        let isSwitchingBoundary = false; // flag to prevent programmatic map event loops
+
+        function switchBoundary(type) {
+            currentBoundaryType = type;
+            
+            // Clear names labels
+            clearRouteBoundaryNameLabels();
+            
+            // Reset selection & route planning state
+            selectedAcNo = null;
+            routePoints = [];
+            insertCursorIndex = null;
+            activeRouteIdx = null;
+            if (typeof activeRouteIndices !== 'undefined') activeRouteIndices.clear();
+
+            // Reset boundary/layer variables
+            assemblyLayers = {};
+            assemblyDataList = [];
+
+            // Remove all administrative layers from map to prepare for switching
+            map.removeLayer(districtLayer);
+            map.removeLayer(assemblyLayer);
+            map.removeLayer(parliamentLayer);
+            map.removeLayer(odLayer);
+
+            let targetLayer = null;
+            if (type === "district") targetLayer = districtLayer;
+            else if (type === "assembly") targetLayer = assemblyLayer;
+            else if (type === "parliament") targetLayer = parliamentLayer;
+            else if (type === "org_district") targetLayer = odLayer;
+
+            const config = boundaryConfigs[type];
+
+            // Update DOM title, subtitle and input placeholders
+            document.getElementById('panel-title').innerText = config.panelTitle;
+            document.getElementById('panel-subtitle').innerText = "State View";
+            
+            const subtitleEl = document.getElementById('sidebar-subtitle');
+            if (subtitleEl) {
+                subtitleEl.innerText = `${config.dataVar.features.length} ${config.listTitle}`;
+            }
+
+            const totalValEl = document.getElementById('stat-total');
+            if (totalValEl) {
+                totalValEl.innerText = config.dataVar.features.length;
+            }
+
+            const totalLabelEl = document.getElementById('stat-total-label');
+            if (totalLabelEl) {
+                totalLabelEl.innerText = config.listTitle;
+            }
+
+            const listTitleEl = document.getElementById('list-title-text');
+            if (listTitleEl) {
+                listTitleEl.innerText = config.listTitle;
+            }
+
+            const searchInput = document.getElementById('route-search-input');
+            if (searchInput) {
+                searchInput.value = '';
+                searchInput.placeholder = `Search in ${config.listTitle}...`;
+            }
+
+            // Update primary color variables for boundary type
+            document.documentElement.style.setProperty('--color-assembly', config.colorVal);
+            
+            // Load saved routes for this boundary type
+            loadSavedRoutesForBoundary(type);
+
+            activeLayerGroup = targetLayer;
+
+            if (targetLayer) {
+                // Style targetLayer with default borders (not custom fill styles)
+                if (type === "assembly") {
+                    targetLayer.setStyle({
+                        fill: true,
+                        fillOpacity: 0,
+                        weight: borderWeight,
+                        color: borderColor,
+                        opacity: 0.8
+                    });
+                } else if (type === "district") {
+                    targetLayer.setStyle({
+                        fill: true,
+                        fillOpacity: 0,
+                        weight: borderWeight + 0.5,
+                        color: borderColor,
+                        opacity: 0.85
+                    });
+                } else if (type === "parliament") {
+                    targetLayer.setStyle({
+                        fill: true,
+                        fillOpacity: 0,
+                        weight: borderWeight + 1.0,
+                        color: borderColor,
+                        opacity: 0.9
+                    });
+                } else if (type === "org_district") {
+                    targetLayer.setStyle({
+                        fill: true,
+                        fillOpacity: 0,
+                        weight: borderWeight + 0.5,
+                        color: borderColor,
+                        opacity: 0.85
+                    });
+                }
+
+                // Add to map
+                isSwitchingBoundary = true;
+                map.addLayer(targetLayer);
+                isSwitchingBoundary = false;
+
+                // Populate assemblyLayers mapping and assemblyDataList for search/lists
+                targetLayer.eachLayer(l => {
+                    const props = l.feature.properties;
+                    const id = config.getId(l.feature);
+                    const name = config.getName(l.feature);
+                    const meta = config.getMeta(l.feature);
+
+                    // Save centroid center
+                    const bounds = l.getBounds();
+                    props.centroid = bounds.getCenter();
+
+                    // Cache layer
+                    assemblyLayers[id] = l;
+
+                    // Build search list item
+                    assemblyDataList.push({
+                        acNo: id,
+                        name: name,
+                        district: meta,
+                        centroid: props.centroid
+                    });
+
+                    // Set up dynamic tooltip
+                    l.bindTooltip(`
+                        <div style="font-family:'Outfit',sans-serif; padding:1px 3px;">
+                            <span style="font-weight:700; color:var(--color-assembly);">${config.tooltipText(l.feature)}</span>
+                        </div>
+                    `, { sticky: true, className: 'leaflet-tooltip-own' });
+
+                    // Update event listeners for Route Planner clicks and hovers
+                    l.off('click');
+                    l.on('click', function(e) {
+                        L.DomEvent.stopPropagation(e);
+                        
+                        if (routeFocusActive && !isAcInAnyActiveRoute(id) && id != selectedAcNo) {
+                            return;
+                        }
+
+                        if (routeModeActive) {
+                            addAcToRouteByNo(id);
+                        } else {
+                            selectConstituency(id, true);
+                        }
+                    });
+
+                    l.off('mouseover');
+                    l.on('mouseover', function(ev) {
+                        const layer = ev.target;
+                        layer.setStyle({
+                            weight: type === 'assembly' ? borderWeight + 1.0 : borderWeight + 1.5,
+                            color: (id == selectedAcNo) ? '#f97316' : borderColor,
+                            opacity: 1
+                        });
+                        if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
+                            layer.bringToFront();
+                        }
+                    });
+
+                    l.off('mouseout');
+                    l.on('mouseout', function(ev) {
+                        const layer = ev.target;
+                        layer.setStyle({
+                            weight: type === 'assembly' ? borderWeight : borderWeight + 0.5,
+                            color: (id == selectedAcNo) ? '#f97316' : borderColor,
+                            opacity: type === 'assembly' ? 0.8 : 0.85
+                        });
+                    });
+                });
+            }
+
+            // Sort search list
+            assemblyDataList.sort((a, b) => {
+                if (typeof a.acNo === 'number' && typeof b.acNo === 'number') {
+                    return a.acNo - b.acNo;
+                }
+                return a.name.localeCompare(b.name);
+            });
+
+            // Re-render UI list & maps
+            refreshConstituencyList();
+            updateRouteUI();
+            updateRouteMap();
+            applyRouteFocusStyle();
+            
+            updateBoundaryLabelsIfNeeded();
+        }
+
+        // Switch Tabs in Sidebar
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById('list-tab-content').style.display = 'none';
+            document.getElementById('route-tab-content').style.display = 'none';
+
+            if (tabId === 'list') {
+                document.getElementById('tab-list').classList.add('active');
+                document.getElementById('list-tab-content').style.display = 'block';
+            } else if (tabId === 'route') {
+                document.getElementById('tab-route').classList.add('active');
+                document.getElementById('route-tab-content').style.display = 'block';
+            }
+        }
+
+        // Toggle Route Planning Mode
+        function toggleRouteMode() {
+            routeModeActive = !routeModeActive;
+            const btn = document.getElementById('toggle-route-mode-btn');
+            
+            if (routeModeActive) {
+                btn.innerHTML = '<i class="fa-solid fa-check"></i> Route Planning Mode Active';
+                btn.className = 'btn btn-accent active';
+                switchTab('route');
+            } else {
+                btn.innerHTML = '<i class="fa-solid fa-route"></i> Enable Route Planning Mode';
+                btn.className = 'btn btn-secondary';
+            }
+        }
+
+        // Populates Constituency List in Sidebar
+        function renderConstituencyList(items) {
+            const container = document.getElementById('constituency-list');
+            container.innerHTML = '';
+            
+            items.forEach(item => {
+                const isActive = item.acNo == selectedAcNo;
+                const isInRoute = routePoints.some(p => p.acNo == item.acNo);
+                const div = document.createElement('div');
+                div.className = `list-item ${isActive ? 'active' : ''}`;
+                div.id = `item-ac-${sanitizeId(item.acNo)}`;
+                
+                let routeBtnHtml = '';
+                if (isInRoute) {
+                    routeBtnHtml = `
+                        <span style="font-size: 11px; color: #ef4444; font-weight: 700; display: inline-flex; align-items:center; cursor:pointer;" onclick="event.stopPropagation(); removeAcFromRouteByNo('${item.acNo}')">
+                            <i class="fa-solid fa-circle-minus"></i> Remove
+                        </span>
+                    `;
+                } else {
+                    routeBtnHtml = `
+                        <span style="font-size: 11px; color: var(--color-route); font-weight: 700; display: inline-flex; align-items:center; cursor:pointer;" onclick="event.stopPropagation(); addAcToRouteByNo('${item.acNo}')">
+                            <i class="fa-solid fa-circle-plus"></i> Add
+                        </span>
+                    `;
+                }
+
+                let labelBadge = "";
+                if (currentBoundaryType === 'assembly') labelBadge = `AC ${item.acNo}`;
+                else if (currentBoundaryType === 'parliament') labelBadge = `PC ${item.acNo}`;
+                else if (currentBoundaryType === 'district') labelBadge = `District`;
+                else labelBadge = `Org Dist`;
+
+                let metaHtml = "";
+                if (currentBoundaryType === 'assembly') {
+                    metaHtml = `<span><i class="fa-solid fa-location-dot"></i> ${item.district}</span>`;
+                } else {
+                    metaHtml = `<span>${item.district}</span>`;
+                }
+
+                div.innerHTML = `
+                    <div class="item-header">
+                        <span class="item-name">${item.name}</span>
+                        <span style="font-size:10px; font-weight:700; color:#cbd5e1;">${labelBadge}</span>
+                    </div>
+                    <div class="item-meta" style="justify-content: space-between;">
+                        ${metaHtml}
+                        ${routeBtnHtml}
+                    </div>
+                `;
+                
+                div.onclick = function() {
+                    selectConstituency(item.acNo, true);
+                };
+                
+                container.appendChild(div);
+            });
+
+            document.getElementById('list-count-route').innerText = items.length;
+        }
+
+        function sanitizeId(id) {
+            return id.toString().replace(/[^a-zA-Z0-9]/g, '_');
+        }
+
+        function refreshConstituencyList() {
+            const searchInput = document.getElementById('route-search-input');
+            const val = searchInput ? searchInput.value.toLowerCase() : '';
+            const filtered = assemblyDataList.filter(item => 
+                item.name.toLowerCase().includes(val) || 
+                (item.district && item.district.toString().toLowerCase().includes(val)) ||
+                item.acNo.toString().toLowerCase() === val
+            );
+            renderConstituencyList(filtered);
+        }
+
+        // Select and Highlight a Constituency
+        function selectConstituency(acNo, zoomTo = false) {
+            const prevAcNo = selectedAcNo;
+            selectedAcNo = acNo;
+
+            // Reset style of previous selection
+            if (prevAcNo && assemblyLayers[prevAcNo]) {
+                assemblyLayers[prevAcNo].setStyle(getACStyle(assemblyLayers[prevAcNo].feature));
+                const prevItem = document.getElementById(`item-ac-${sanitizeId(prevAcNo)}`);
+                if (prevItem) prevItem.classList.remove('active');
+            }
+
+            // Style new selection
+            if (selectedAcNo && assemblyLayers[selectedAcNo]) {
+                const layer = assemblyLayers[selectedAcNo];
+                layer.setStyle(getACStyle(layer.feature));
+                layer.bringToFront();
+
+                const item = document.getElementById(`item-ac-${sanitizeId(selectedAcNo)}`);
+                if (item) {
+                    item.classList.add('active');
+                    item.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+
+                // Update Map Header Info Panel
+                const props = layer.feature.properties;
+                const config = boundaryConfigs[currentBoundaryType];
+                document.getElementById('panel-title').innerText = config.getName(layer.feature).toUpperCase();
+                document.getElementById('panel-subtitle').innerText = config.getMeta(layer.feature);
+
+                const center = props.centroid;
+
+                if (zoomTo) {
+                    map.setView(center, 10, { animate: true, duration: 1.0 });
+                    layer.bindPopup(config.getPopup(layer.feature, isAcInAnyActiveRoute(selectedAcNo), 'addAcToRouteByNo', 'removeAcFromRouteByNo'), { closeButton: false }).openPopup(center);
+                }
+            } else {
+                const config = boundaryConfigs[currentBoundaryType];
+                document.getElementById('panel-title').innerText = config.panelTitle;
+                document.getElementById('panel-subtitle').innerText = "State View";
+            }
+        }
+
+        function handleDragStart(e) {
+            draggedItemIndex = parseInt(this.dataset.index);
+            e.dataTransfer.effectAllowed = 'move';
+            this.style.opacity = '0.5';
+        }
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            return false;
+        }
+        function handleDragEnter(e) {
+            e.preventDefault();
+            this.classList.add('drag-over');
+        }
+        function handleDragLeave(e) {
+            this.classList.remove('drag-over');
+        }
+        function handleDrop(e) {
+            e.stopPropagation();
+            this.classList.remove('drag-over');
+            const dropIndex = parseInt(this.dataset.index);
+            if (draggedItemIndex !== null && draggedItemIndex !== dropIndex) {
+                const item = routePoints.splice(draggedItemIndex, 1)[0];
+                routePoints.splice(dropIndex, 0, item);
+                insertCursorIndex = null;
+                updateRouteUI();
+                updateRouteMap();
+                applyRouteFocusStyle();
+            }
+            return false;
+        }
+        function handleDragEnd(e) {
+            this.style.opacity = '1';
+            document.querySelectorAll('.route-item').forEach(i => i.classList.remove('drag-over'));
+        }
+
+        function toggleInsertCursor(idx) {
+            if (insertCursorIndex === idx) {
+                insertCursorIndex = null;
+            } else {
+                insertCursorIndex = idx;
+            }
+            updateRouteUI();
+        }
+
+        function addAcToRouteByNo(acNo) {
+            const acObj = assemblyDataList.find(item => item.acNo == acNo);
+            if (!acObj) return;
+
+            if (insertCursorIndex !== null) {
+                if (routePoints[insertCursorIndex] && routePoints[insertCursorIndex].acNo == acNo) return;
+                if (routePoints[insertCursorIndex + 1] && routePoints[insertCursorIndex + 1].acNo == acNo) return;
+                
+                routePoints.splice(insertCursorIndex + 1, 0, acObj);
+                insertCursorIndex++;
+            } else {
+                if (routePoints.length > 0 && routePoints[routePoints.length - 1].acNo == acNo) {
+                    return;
+                }
+                routePoints.push(acObj);
+            }
+
+            updateRouteUI();
+            updateRouteMap();
+            applyRouteFocusStyle();
+        }
+
+        function removeAcFromRouteByNo(acNo) {
+            if (typeof routePoints === 'undefined') return;
+            routePoints = routePoints.filter(p => p.acNo != acNo);
+            updateRouteUI();
+            updateRouteMap();
+            applyRouteFocusStyle();
+        }
+
+        function removeRoutePoint(index) {
+            routePoints.splice(index, 1);
+            updateRouteUI();
+            updateRouteMap();
+            applyRouteFocusStyle();
+        }
+
+        function moveRoutePoint(index, direction) {
+            if (direction === -1 && index === 0) return;
+            if (direction === 1 && index === routePoints.length - 1) return;
+
+            const targetIdx = index + direction;
+            const temp = routePoints[index];
+            routePoints[index] = routePoints[targetIdx];
+            routePoints[targetIdx] = temp;
+
+            updateRouteUI();
+            updateRouteMap();
+            applyRouteFocusStyle();
+        }
+
+        function clearRoute() {
+            routePoints = [];
+            activeRouteIdx = null;
+            activeRouteIndices.clear();
+            insertCursorIndex = null;
+            
+            const select = document.getElementById('active-route-select');
+            if (select) select.value = 'new';
+            
+            if (routeFocusActive) {
+                toggleRouteFocus();
+            } else {
+                updateRouteUI();
+                updateRouteMap();
+                applyRouteFocusStyle();
+            }
+            populateSavedRoutesDropdown();
+            refreshAllSavedRoutesOnMap();
+        }
+
+        function toggleRouteFocus() {
+            const hasAnyRoute = routePoints.length > 0 || (typeof activeRouteIndices !== 'undefined' && activeRouteIndices.size > 0);
+            if (!hasAnyRoute && !routeFocusActive) {
+                alert("Please add at least one stop or select a route first!");
+                return;
+            }
+            routeFocusActive = !routeFocusActive;
+            const btn = document.getElementById('focus-route-btn');
+            if (routeFocusActive) {
+                btn.innerHTML = '<i class="fa-solid fa-eye"></i> Show All Areas';
+                btn.classList.add('active');
+            } else {
+                btn.innerHTML = '<i class="fa-solid fa-eye-slash"></i> Focus Route Only';
+                btn.classList.remove('active');
+            }
+            applyRouteFocusStyle();
+        }
+
+        function applyRouteFocusStyle() {
+            if (activeLayerGroup) {
+                activeLayerGroup.eachLayer(layer => {
+                    layer.setStyle(getACStyle(layer.feature));
+                });
+            }
+            updateBoundaryLabelsIfNeeded();
+        }
+
+        function hexToRgba(hex, alpha) {
+            hex = hex.replace('#', '');
+            if (hex.length === 3) {
+                hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+            }
+            let r = parseInt(hex.substring(0, 2), 16);
+            let g = parseInt(hex.substring(2, 4), 16);
+            let b = parseInt(hex.substring(4, 6), 16);
+            return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+        }
+
+        function hexToRgb(hex) {
+            hex = hex.replace('#', '');
+            if (hex.length === 3) {
+                hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+            }
+            if (hex.length !== 6) return null;
+            let r = parseInt(hex.substring(0, 2), 16);
+            let g = parseInt(hex.substring(2, 4), 16);
+            let b = parseInt(hex.substring(4, 6), 16);
+            return { r, g, b };
+        }
+
+        function updateRouteColor(val) {
+            routeColor = val;
+            document.documentElement.style.setProperty('--color-route', val);
+
+            let targetIdx = activeRouteIdx;
+            if (targetIdx === null && typeof activeRouteIndices !== 'undefined' && activeRouteIndices.size > 0) {
+                targetIdx = Array.from(activeRouteIndices).pop();
+            }
+            if (targetIdx !== null && savedRoutes[targetIdx]) {
+                savedRoutes[targetIdx].color = val;
+                saveRoutesToStorage();
+            }
+
+            syncMatchedColors();
+            updateRouteMap();
+            applyRouteFocusStyle();
+            refreshAllSavedRoutesOnMap();
+            populateSavedRoutesDropdown();
+        }
+
+        function updateBorderColor(val) {
+            borderColor = val;
+            if (routeStateBoundaryLayer) {
+                routeStateBoundaryLayer.setStyle({ color: val });
+            }
+            applyRouteFocusStyle();
+        }
+
+        function updateBorderWeight(val) {
+            borderWeight = parseFloat(val);
+            if (routeStateBoundaryLayer) {
+                routeStateBoundaryLayer.setStyle({ weight: Math.max(1, borderWeight * 1.67) });
+            }
+            document.getElementById('border-weight-value').textContent = val;
+            applyRouteFocusStyle();
+        }
+
+        function updateFillColor(val) {
+            let targetIdx = activeRouteIdx;
+            if (targetIdx === null && typeof activeRouteIndices !== 'undefined' && activeRouteIndices.size > 0) {
+                targetIdx = Array.from(activeRouteIndices).pop();
+            }
+
+            if (targetIdx !== null && savedRoutes[targetIdx]) {
+                savedRoutes[targetIdx].fillColor = val;
+                savedRoutes[targetIdx].fillMatchRoute = false;
+                saveRoutesToStorage();
+            } else {
+                fillColor = val;
+                fillMatchRoute = false;
+            }
+            
+            const matchCheckbox = document.getElementById('fill-match-route');
+            if (matchCheckbox) {
+                matchCheckbox.checked = false;
+                const picker = document.getElementById('fill-color-picker');
+                if (picker) {
+                    picker.disabled = false;
+                    picker.style.opacity = '1';
+                }
+            }
+            
+            applyRouteFocusStyle();
+        }
+
+        function updateFillOpacity(val) {
+            fillOpacity = parseInt(val) / 100;
+            document.getElementById('fill-opacity-value').textContent = val + '%';
+            applyRouteFocusStyle();
+        }
+
+        function toggleInverseFill(checked) {
+            inverseFillActive = checked;
+            applyRouteFocusStyle();
+        }
+
+        function toggleFillMatchRoute(checked) {
+            fillMatchRoute = checked;
+            const picker = document.getElementById('fill-color-picker');
+
+            let targetIdx = activeRouteIdx;
+            if (targetIdx === null && typeof activeRouteIndices !== 'undefined' && activeRouteIndices.size > 0) {
+                targetIdx = Array.from(activeRouteIndices).pop();
+            }
+
+            if (checked) {
+                const rColor = (targetIdx !== null && savedRoutes[targetIdx] && savedRoutes[targetIdx].color) ? savedRoutes[targetIdx].color : routeColor;
+                picker.value = rColor;
+                picker.disabled = true;
+                picker.style.opacity = '0.4';
+                
+                if (targetIdx !== null && savedRoutes[targetIdx]) {
+                      savedRoutes[targetIdx].fillMatchRoute = true;
+                      savedRoutes[targetIdx].fillColor = rColor;
+                      saveRoutesToStorage();
+                  } else {
+                      fillColor = rColor;
+                  }
+              } else {
+                  picker.disabled = false;
+                  picker.style.opacity = '1';
+                  if (targetIdx !== null && savedRoutes[targetIdx]) {
+                      savedRoutes[targetIdx].fillMatchRoute = false;
+                      saveRoutesToStorage();
+                  }
+              }
+            applyRouteFocusStyle();
+        }
+
+        function syncMatchedColors() {
+            let targetIdx = activeRouteIdx;
+            if (targetIdx === null && typeof activeRouteIndices !== 'undefined' && activeRouteIndices.size > 0) {
+                targetIdx = Array.from(activeRouteIndices).pop();
+            }
+
+            const isMatched = (targetIdx !== null && savedRoutes[targetIdx]) 
+                ? savedRoutes[targetIdx].fillMatchRoute 
+                : fillMatchRoute;
+
+            if (isMatched) {
+                const rColor = (targetIdx !== null && savedRoutes[targetIdx] && savedRoutes[targetIdx].color) ? savedRoutes[targetIdx].color : routeColor;
+                
+                const fp = document.getElementById('fill-color-picker');
+                if (fp) fp.value = rColor;
+                
+                if (targetIdx !== null && savedRoutes[targetIdx]) {
+                    savedRoutes[targetIdx].fillColor = rColor;
+                    saveRoutesToStorage();
+                } else {
+                    fillColor = rColor;
+                }
+            }
+        }
+
+        const defaultRoutesByBoundary = {
+            assembly: [
+                { name: "Route 1", acNos: [3, 1, 2, 5, 4, 39, 40, 43, 45, 49, 50, 64], color: '#ea580c' },
+                { name: "Route 2", acNos: [18, 11, 10, 7, 36, 29, 30, 64], color: '#ea580c' },
+                { name: "Route 3", acNos: [81, 80, 87, 76, 73, 92, 96, 103, 107, 64], color: '#ea580c' },
+                { name: "Route 4", acNos: [53, 52, 111, 115, 108, 55, 57, 51, 64], color: '#ea580c' }
+            ],
+            parliament: [],
+            district: [],
+            org_district: []
+        };
+
+        function loadSavedRoutesForBoundary(type) {
+            const config = boundaryConfigs[type];
+            const storageKey = config.storageKey;
+            try {
+                const raw = localStorage.getItem(storageKey);
+                if (raw) {
+                    savedRoutes = JSON.parse(raw);
+                } else {
+                    savedRoutes = [...(defaultRoutesByBoundary[type] || [])];
+                    localStorage.setItem(storageKey, JSON.stringify(savedRoutes));
+                }
+            } catch(e) {
+                console.error("Failed to parse saved routes for " + type, e);
+                savedRoutes = [...(defaultRoutesByBoundary[type] || [])];
+            }
+            populateSavedRoutesDropdown();
+        }
+
+        function handleActiveRouteSelect(val) {
+            if (val === 'new') {
+                clearRoute();
+            } else {
+                const idx = parseInt(val);
+                loadSavedRoute(idx);
+            }
+        }
+
+        function refreshAllSavedRoutesOnMap() {
+            const checkbox = document.getElementById('show-all-saved-routes-checkbox');
+            const isChecked = checkbox ? checkbox.checked : false;
+            
+            if (allSavedRoutesLayer) {
+                map.removeLayer(allSavedRoutesLayer);
+                allSavedRoutesLayer = null;
+            }
+            
+            if (!isChecked) return;
+            
+            allSavedRoutesLayer = L.layerGroup();
+            
+            savedRoutes.forEach((r, idx) => {
+                if (typeof activeRouteIndices !== "undefined" && activeRouteIndices.has(idx)) return;
+                
+                const latlngs = [];
+                r.acNos.forEach(acNo => {
+                    const pt = assemblyDataList.find(item => item.acNo == acNo);
+                    if (pt && pt.centroid) {
+                        latlngs.push(pt.centroid);
+                    }
+                });
+                
+                if (latlngs.length > 0) {
+                    const color = r.color || '#ea580c';
+                    
+                    const polyline = L.polyline(latlngs, {
+                        color: color,
+                        weight: 4,
+                        opacity: 0.55,
+                        dashArray: '5, 10',
+                        pane: 'routePane'
+                    });
+                    
+                    polyline.bindTooltip(`<div style="font-family:'Outfit',sans-serif;font-weight:700;color:${color};">${r.name} (${r.acNos.length} stops)</div>`, { sticky: true });
+                    polyline.addTo(allSavedRoutesLayer);
+                    
+                    latlngs.forEach((latlng, stopIdx) => {
+                        const marker = L.circleMarker(latlng, {
+                            radius: 5,
+                            fillColor: '#ffffff',
+                            fillOpacity: 1,
+                            color: color,
+                            weight: 2,
+                            pane: 'routePane'
+                        });
+                        marker.bindTooltip(`<div style="font-family:'Outfit',sans-serif;font-size:11px;"><b>${r.name}</b><br>Stop ${stopIdx + 1}</div>`, { sticky: true });
+                        marker.addTo(allSavedRoutesLayer);
+                    });
+                }
+            });
+            
+            allSavedRoutesLayer.addTo(map);
+        }
+
+        function toggleAllSavedRoutesVisibility(visible) {
+            refreshAllSavedRoutesOnMap();
+        }
+
+        function populateSavedRoutesDropdown() {
+            const optionsContainer = document.getElementById('custom-route-options');
+            const titleSpan = document.getElementById('custom-route-title');
+            
+            if (optionsContainer) {
+                optionsContainer.innerHTML = '';
+                
+                const newOpt = document.createElement('div');
+                newOpt.style.cssText = 'padding: 8px 12px; font-size: 12px; cursor: pointer; border-bottom: 1px solid var(--border-light); color: var(--primary-color); font-weight: 600;';
+                newOpt.textContent = '+ Create New Route...';
+                newOpt.onclick = () => {
+                    handleActiveRouteSelect('new');
+                    document.getElementById('custom-route-options').style.display = 'none';
+                };
+                optionsContainer.appendChild(newOpt);
+
+                savedRoutes.forEach((r, idx) => {
+                    const item = document.createElement('label');
+                    item.style.cssText = 'padding: 6px 12px; font-size: 12px; display: flex; align-items: center; gap: 8px; cursor: pointer; margin: 0;';
+                    item.onmouseover = () => item.style.background = '#f8fafc';
+                    item.onmouseout = () => item.style.background = 'none';
+                    
+                    const cb = document.createElement('input');
+                    cb.type = 'checkbox';
+                    cb.checked = (typeof activeRouteIndices !== 'undefined' && activeRouteIndices.has(idx));
+                    cb.style.cssText = 'cursor: pointer; width: 13px; height: 13px; margin: 0;';
+                    
+                    const labelSpan = document.createElement('span');
+                    labelSpan.textContent = `${r.name} (${r.acNos.length} stops)`;
+                    labelSpan.style.cssText = 'flex: 1; user-select: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;';
+                    
+                    const actionsDiv = document.createElement('div');
+                    actionsDiv.style.cssText = 'display: flex; gap: 4px;';
+                    
+                    const editBtn = document.createElement('button');
+                    editBtn.innerHTML = '<i class="fa-solid fa-pen"></i>';
+                    editBtn.style.cssText = 'background:none; border:none; color:#3b82f6; cursor:pointer; padding:2px 4px; opacity:0.7;';
+                    editBtn.title = "Edit Route";
+                    editBtn.onclick = (e) => { 
+                        e.stopPropagation(); 
+                        loadSavedRoute(idx); 
+                        document.getElementById('custom-route-options').style.display='none'; 
+                    };
+                    editBtn.onmouseover = () => editBtn.style.opacity = '1';
+                    editBtn.onmouseout = () => editBtn.style.opacity = '0.7';
+                    
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.innerHTML = '<i class="fa-solid fa-trash-can"></i>';
+                    deleteBtn.style.cssText = 'background:none; border:none; color:#ef4444; cursor:pointer; padding:2px 4px; opacity:0.7;';
+                    deleteBtn.title = "Delete Route";
+                    deleteBtn.onclick = (e) => { 
+                        e.stopPropagation(); 
+                        if (confirm(`Are you sure you want to delete "${r.name}"?`)) {
+                            savedRoutes.splice(idx, 1);
+                            if (activeRouteIdx === idx) {
+                                activeRouteIdx = null;
+                                routePoints = [];
+                                updateRouteUI();
+                            } else if (activeRouteIdx > idx) {
+                                activeRouteIdx--;
+                            }
+                            if (typeof activeRouteIndices !== 'undefined') {
+                                const newActive = new Set();
+                                activeRouteIndices.forEach(i => {
+                                    if (i < idx) newActive.add(i);
+                                    else if (i > idx) newActive.add(i - 1);
+                                });
+                                activeRouteIndices = newActive;
+                            }
+                            saveRoutesToStorage();
+                            populateSavedRoutesDropdown();
+                            refreshAllSavedRoutesOnMap();
+                        }
+                    };
+                    deleteBtn.onmouseover = () => deleteBtn.style.opacity = '1';
+                    deleteBtn.onmouseout = () => deleteBtn.style.opacity = '0.7';
+
+                    cb.onchange = (e) => {
+                        if (typeof activeRouteIndices === 'undefined') window.activeRouteIndices = new Set();
+                        if (e.target.checked) {
+                            activeRouteIndices.add(idx);
+                        } else {
+                            activeRouteIndices.delete(idx);
+                            if (activeRouteIdx === idx) {
+                                activeRouteIdx = null;
+                                routePoints = [];
+                                updateRouteUI();
+                            }
+                        }
+                        updateCustomDropdownTitle();
+                        updateRouteMap();
+                        refreshAllSavedRoutesOnMap();
+                    };
+                    
+                    actionsDiv.appendChild(editBtn);
+                    actionsDiv.appendChild(deleteBtn);
+
+                    item.appendChild(cb);
+                    item.appendChild(labelSpan);
+                    item.appendChild(actionsDiv);
+                    optionsContainer.appendChild(item);
+                });
+                
+                updateCustomDropdownTitle();
+            }
+
+            const container = document.getElementById('saved-routes-list');
+            if (!container) return;
+            container.innerHTML = '';
+
+            if (savedRoutes.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align: center; padding: 16px; color: var(--text-muted); font-size: 12px; background: #f8fafc; border: 1px dashed var(--border-light); border-radius: 8px; font-family: 'Outfit', sans-serif;">
+                        No saved routes yet.
+                    </div>
+                `;
+                return;
+            }
+
+            savedRoutes.forEach((r, idx) => {
+                const card = document.createElement('div');
+                card.className = 'saved-route-card' + (activeRouteIdx === idx ? ' active' : '');
+                
+                card.onclick = (e) => {
+                    if (e.target.tagName === 'INPUT' || e.target.closest('.delete-route-btn')) return;
+                    loadSavedRoute(idx);
+                };
+
+                const leftDiv = document.createElement('div');
+                leftDiv.style.cssText = 'display: flex; align-items: center; gap: 10px;';
+
+                const colorPicker = document.createElement('input');
+                colorPicker.type = 'color';
+                colorPicker.value = r.color || '#ea580c';
+                colorPicker.style.cssText = 'width: 20px; height: 20px; border: 1px solid rgba(0, 0, 0, 0.12); border-radius: 4px; cursor: pointer; padding: 0; background: none; flex-shrink: 0;';
+                colorPicker.onclick = (e) => e.stopPropagation();
+                colorPicker.onchange = (e) => {
+                    r.color = e.target.value;
+                    saveRoutesToStorage();
+                    if (activeRouteIdx === idx) {
+                        routeColor = r.color;
+                        document.documentElement.style.setProperty('--color-route', routeColor);
+                    }
+                    updateRouteMap();
+                    refreshAllSavedRoutesOnMap();
+                };
+
+                const info = document.createElement('div');
+                info.style.cssText = 'display: flex; flex-direction: column; align-items: flex-start; overflow: hidden;';
+
+                const nameSpan = document.createElement('span');
+                nameSpan.style.cssText = 'font-size: 13px; font-weight: 600; color: var(--text-primary); font-family: "Outfit", sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%;';
+                nameSpan.textContent = r.name;
+
+                const stopsSpan = document.createElement('span');
+                stopsSpan.style.cssText = 'font-size: 11px; color: var(--text-muted); font-family: "Outfit", sans-serif;';
+                stopsSpan.textContent = `${r.acNos.length} stops`;
+
+                info.appendChild(nameSpan);
+                info.appendChild(stopsSpan);
+                
+                leftDiv.appendChild(colorPicker);
+                leftDiv.appendChild(info);
+
+                const actionsDiv = document.createElement('div');
+                actionsDiv.style.cssText = 'display: flex; gap: 4px;';
+
+                const editBtn = document.createElement('button');
+                editBtn.className = 'edit-route-btn';
+                editBtn.style.cssText = `
+                    background: none;
+                    border: none;
+                    cursor: pointer;
+                    color: #3b82f6;
+                    padding: 6px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    opacity: 0.6;
+                    transition: opacity 0.2s, background 0.2s;
+                    border-radius: 4px;
+                `;
+                editBtn.innerHTML = '<i class="fa-solid fa-pen" style="font-size: 12px;"></i>';
+                editBtn.title = "Edit this route";
+                editBtn.onmouseover = () => {
+                    editBtn.style.opacity = '1';
+                    editBtn.style.background = '#dbeafe';
+                };
+                editBtn.onmouseout = () => {
+                    editBtn.style.opacity = '0.6';
+                    editBtn.style.background = 'none';
+                };
+                editBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    loadSavedRoute(idx);
+                };
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'delete-route-btn';
+                deleteBtn.style.cssText = `
+                    background: none;
+                    border: none;
+                    cursor: pointer;
+                    color: #ef4444;
+                    padding: 6px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    opacity: 0.6;
+                    transition: opacity 0.2s, background 0.2s;
+                    border-radius: 4px;
+                `;
+                deleteBtn.innerHTML = '<i class="fa-solid fa-trash-can" style="font-size: 12px;"></i>';
+                deleteBtn.title = "Delete this route";
+                deleteBtn.onmouseover = () => {
+                    deleteBtn.style.opacity = '1';
+                    deleteBtn.style.background = '#fee2e2';
+                };
+                deleteBtn.onmouseout = () => {
+                    deleteBtn.style.opacity = '0.6';
+                    deleteBtn.style.background = 'none';
+                };
+                
+                deleteBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    if (confirm(`Are you sure you want to delete the route "${r.name}"?`)) {
+                          savedRoutes.splice(idx, 1);
+                          saveRoutesToStorage();
+                          
+                          if (typeof activeRouteIndices !== 'undefined') {
+                            const newActive = new Set();
+                            activeRouteIndices.forEach(i => {
+                                if (i < idx) newActive.add(i);
+                                else if (i > idx) newActive.add(i - 1);
+                            });
+                            activeRouteIndices = newActive;
+                        }
+                        
+                        if (activeRouteIdx === idx) {
+                            activeRouteIdx = null;
+                            clearRoute();
+                        } else if (activeRouteIdx > idx) {
+                            activeRouteIdx--;
+                        }
+                        
+                        populateSavedRoutesDropdown();
+                        refreshAllSavedRoutesOnMap();
+                        updateRouteMap();
+                    }
+                };
+
+                actionsDiv.appendChild(editBtn);
+                actionsDiv.appendChild(deleteBtn);
+                card.appendChild(leftDiv);
+                card.appendChild(actionsDiv);
+                container.appendChild(card);
+            });
+        }
+        
+        function updateCustomDropdownTitle() {
+            const titleSpan = document.getElementById('custom-route-title');
+            if (!titleSpan) return;
+            if (typeof activeRouteIndices === 'undefined' || activeRouteIndices.size === 0) {
+                titleSpan.textContent = '+ Create New Route...';
+            } else if (activeRouteIndices.size === 1) {
+                const idx = Array.from(activeRouteIndices)[0];
+                titleSpan.textContent = savedRoutes[idx] ? savedRoutes[idx].name : '1 Route Selected';
+            } else {
+                titleSpan.textContent = `${activeRouteIndices.size} Routes Selected`;
+            }
+        }
+        
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(event) {
+            const container = document.getElementById('custom-multi-select');
+            if (container && !container.contains(event.target)) {
+                const options = document.getElementById('custom-route-options');
+                if (options) options.style.display = 'none';
+            }
+        });
+
+        function saveRoutePrompt() {
+            if (routePoints.length === 0) {
+                alert("Please add at least one stop to the route first!");
+                return;
+            }
+            
+            let defaultName = "";
+            if (activeRouteIdx !== null && savedRoutes[activeRouteIdx]) {
+                defaultName = savedRoutes[activeRouteIdx].name;
+            }
+            
+            const name = prompt("Enter a name for this route:", defaultName);
+            if (!name || name.trim() === "") return;
+
+            const newRoute = {
+                name: name.trim(),
+                acNos: routePoints.map(p => p.acNo),
+                color: routeColor,
+                fillColor: fillColor,
+                fillMatchRoute: (activeRouteIdx !== null && savedRoutes[activeRouteIdx]) ? savedRoutes[activeRouteIdx].fillMatchRoute : fillMatchRoute
+            };
+
+            const existingIdx = savedRoutes.findIndex(r => r.name.toLowerCase() === newRoute.name.toLowerCase());
+            if (existingIdx !== -1) {
+                if (existingIdx !== activeRouteIdx) {
+                    if (!confirm(`A route named "${newRoute.name}" already exists. Overwrite?`)) {
+                        return;
+                    }
+                }
+                savedRoutes[existingIdx] = newRoute;
+                activeRouteIdx = existingIdx;
+            } else {
+                if (activeRouteIdx !== null) {
+                    savedRoutes[activeRouteIdx] = newRoute;
+                } else {
+                    savedRoutes.push(newRoute);
+                    activeRouteIdx = savedRoutes.length - 1;
+                }
+            }
+
+            saveRoutesToStorage();
+            populateSavedRoutesDropdown();
+            
+            const select = document.getElementById('active-route-select');
+            if (select) select.value = activeRouteIdx.toString();
+            
+            refreshAllSavedRoutesOnMap();
+            alert("Route saved successfully!");
+        }
+
+        function loadSavedRoute(idxVal, clearIndices = true) {
+            if (idxVal === "" || idxVal === null) return;
+            const idx = parseInt(idxVal);
+            const r = savedRoutes[idx];
+            if (!r) return;
+
+            activeRouteIdx = idx;
+            if (typeof activeRouteIndices === 'undefined') window.activeRouteIndices = new Set();
+            if (clearIndices) {
+                activeRouteIndices.clear();
+            }
+            activeRouteIndices.add(idx);
+
+            routePoints = [];
+            r.acNos.forEach(acNo => {
+                const ptObj = assemblyDataList.find(item => item.acNo == acNo);
+                if (ptObj) {
+                    routePoints.push(ptObj);
+                }
+            });
+
+            // Restore color
+            if (r.color) {
+                routeColor = r.color;
+                const picker = document.getElementById('route-color-picker');
+                if (picker) picker.value = routeColor;
+                document.documentElement.style.setProperty('--color-route', routeColor);
+            }
+
+            // Restore fill color and matching checkbox
+            const fcp = document.getElementById('fill-color-picker');
+            const matchCheckbox = document.getElementById('fill-match-route');
+            
+            if (r.fillMatchRoute) {
+                if (matchCheckbox) matchCheckbox.checked = true;
+                if (fcp) {
+                    fcp.value = r.color || routeColor;
+                    fcp.disabled = true;
+                    fcp.style.opacity = '0.4';
+                }
+            } else {
+                if (matchCheckbox) matchCheckbox.checked = false;
+                if (fcp) {
+                    fcp.value = r.fillColor || r.color || routeColor;
+                    fcp.disabled = false;
+                    fcp.style.opacity = '1';
+                }
+            }
+
+            updateRouteUI();
+            updateRouteMap();
+            applyRouteFocusStyle();
+            populateSavedRoutesDropdown();
+        }
+
+        function updateRouteUI() {
+            document.getElementById('stat-active-route').innerText = routePoints.length;
+            const container = document.getElementById('route-items-container');
+            container.innerHTML = '';
+
+            if (routePoints.length === 0) {
+                container.innerHTML = `
+                    <div class="route-empty">
+                        <i class="fa-solid fa-map-pin"></i>
+                        No route points added yet.
+                    </div>
+                `;
+            } else {
+                routePoints.forEach((point, idx) => {
+                    const div = document.createElement('div');
+                    div.className = 'route-item';
+                    
+                    const isInsertTarget = insertCursorIndex === idx;
+                    if (isInsertTarget) {
+                        div.style.borderBottom = '2px solid var(--color-route)';
+                        div.style.backgroundColor = '#eff6ff';
+                    }
+
+                    div.innerHTML = `
+                        <div class="route-item-info">
+                            <div class="route-idx">${idx + 1}</div>
+                            <span class="route-item-name">${point.name}</span>
+                        </div>
+                        <div class="route-item-actions">
+                            <button class="route-action-btn ${isInsertTarget ? 'insert-active' : ''}" onclick="toggleInsertCursor(${idx})" title="Insert next stop after this">
+                                <i class="fa-solid fa-turn-down fa-rotate-90" style="${isInsertTarget ? 'color: var(--color-route);' : ''}"></i>
+                            </button>
+                            <button class="route-action-btn" onclick="moveRoutePoint(${idx}, -1)" ${idx === 0 ? 'disabled style="opacity:0.3;"' : ''}>
+                                <i class="fa-solid fa-chevron-up"></i>
+                            </button>
+                            <button class="route-action-btn" onclick="moveRoutePoint(${idx}, 1)" ${idx === routePoints.length - 1 ? 'disabled style="opacity:0.3;"' : ''}>
+                                <i class="fa-solid fa-chevron-down"></i>
+                            </button>
+                            <button class="route-action-btn delete" onclick="removeRoutePoint(${idx})">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </div>
+                    `;
+
+                    div.draggable = true;
+                    div.dataset.index = idx;
+                    div.addEventListener('dragstart', handleDragStart);
+                    div.addEventListener('dragover', handleDragOver);
+                    div.addEventListener('dragenter', handleDragEnter);
+                    div.addEventListener('dragleave', handleDragLeave);
+                    div.addEventListener('drop', handleDrop);
+                    div.addEventListener('dragend', handleDragEnd);
+
+                    container.appendChild(div);
+                });
+            }
+
+            if (selectedAcNo && assemblyLayers[selectedAcNo]) {
+                const layer = assemblyLayers[selectedAcNo];
+                const popup = layer.getPopup();
+                if (popup && popup.isOpen()) {
+                    const config = boundaryConfigs[currentBoundaryType];
+                    popup.setContent(config.getPopup(layer.feature, isAcInAnyActiveRoute(selectedAcNo), 'addAcToRouteByNo', 'removeAcFromRouteByNo'));
+                }
+            }
+
+            refreshConstituencyList();
+        }
+
+        function updateRouteMap() {
+            if (routePolyline) {
+                map.removeLayer(routePolyline);
+                routePolyline = null;
+            }
+            activeRoutePolylines.forEach(layer => map.removeLayer(layer));
+            activeRoutePolylines = [];
+
+            routeMarkers.forEach(m => map.removeLayer(m));
+            routeMarkers = [];
+
+            if (typeof activeRouteIndices !== 'undefined') {
+                activeRouteIndices.forEach(idx => {
+                    if (idx === activeRouteIdx) return;
+
+                    const r = savedRoutes[idx];
+                    if (!r) return;
+                    const rLatlngs = [];
+                    const rPoints = [];
+                    r.acNos.forEach(acNo => {
+                        const pt = assemblyDataList.find(item => item.acNo == acNo);
+                        if (pt && pt.centroid) {
+                            rLatlngs.push(pt.centroid);
+                            rPoints.push(pt);
+                        }
+                    });
+
+                    const col = r.color || '#ea580c';
+
+                    if (rLatlngs.length > 1) {
+                        const polyline = L.polyline(rLatlngs, {
+                            pane: 'routePane',
+                            color: col,
+                            weight: 4.5,
+                            opacity: 0.9,
+                            className: 'route-path',
+                            lineJoin: 'round'
+                        }).addTo(map);
+                        activeRoutePolylines.push(polyline);
+                    }
+
+                    rPoints.forEach((point, stopIdx) => {
+                        const stopText = stopIdx + 1;
+                        const stopFontSize = stopText >= 100 ? 24 : (stopText >= 10 ? 32 : 46);
+                        const svgHtml = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 256 256">
+<g transform="translate(1.4 1.4) scale(2.81 2.81)">
+	<path d="M 45 90 c -1.415 0 -2.725 -0.748 -3.444 -1.966 l -4.385 -7.417 C 28.167 65.396 19.664 51.02 16.759 45.189 c -2.112 -4.331 -3.175 -8.955 -3.175 -13.773 C 13.584 14.093 27.677 0 45 0 c 17.323 0 31.416 14.093 31.416 31.416 c 0 4.815 -1.063 9.438 -3.157 13.741 c -0.025 0.052 -0.053 0.104 -0.08 0.155 c -2.961 5.909 -11.41 20.193 -20.353 35.309 l -4.382 7.413 C 47.725 89.252 46.415 90 45 90 z" style="fill: ${col};"/>
+	<path d="M 45 45.678 c -8.474 0 -15.369 -6.894 -15.369 -15.368 S 36.526 14.941 45 14.941 c 8.474 0 15.368 6.895 15.368 15.369 S 53.474 45.678 45 45.678 z" style="fill: #ffffff;"/>
+</g>
+<text x="128" y="86" font-family="'Outfit', sans-serif" font-size="${stopFontSize}" font-weight="bold" fill="black" text-anchor="middle" dominant-baseline="central">${stopText}</text>
+</svg>`;
+                        const customIcon = L.divIcon({
+                            html: svgHtml,
+                            className: 'custom-route-icon-svg',
+                            iconSize: [32, 32],
+                            iconAnchor: [16, 32]
+                        });
+                        const marker = L.marker(point.centroid, {
+                            pane: 'routePane',
+                            icon: customIcon
+                        }).addTo(map);
+                        marker.bindTooltip(`<div style="font-family:'Outfit',sans-serif;font-size:12px;"><b>${point.name}</b><br>Stop ${stopIdx + 1}<br><span style="color:${col}">${r.name}</span></div>`, { sticky: true });
+                        routeMarkers.push(marker);
+                    });
+                });
+            }
+
+            if (routePoints.length > 0) {
+                const latlngs = routePoints.map(p => p.centroid);
+
+                if (latlngs.length > 1) {
+                    routePolyline = L.polyline(latlngs, {
+                        pane: 'routePane',
+                        color: routeColor,
+                        weight: 4.5,
+                        opacity: 0.9,
+                        className: 'route-path',
+                        lineJoin: 'round'
+                    }).addTo(map);
+                }
+
+                routePoints.forEach((point, idx) => {
+                    const col = routeColor;
+                    const stopText = idx + 1;
+                    const stopFontSize = stopText >= 100 ? 24 : (stopText >= 10 ? 32 : 46);
+                    const svgHtml = `<svg xmlns="http://www.w3.org/2000/svg" width="38" height="38" viewBox="0 0 256 256">
+<g transform="translate(1.4 1.4) scale(2.81 2.81)">
+	<path d="M 45 90 c -1.415 0 -2.725 -0.748 -3.444 -1.966 l -4.385 -7.417 C 28.167 65.396 19.664 51.02 16.759 45.189 c -2.112 -4.331 -3.175 -8.955 -3.175 -13.773 C 13.584 14.093 27.677 0 45 0 c 17.323 0 31.416 14.093 31.416 31.416 c 0 4.815 -1.063 9.438 -3.157 13.741 c -0.025 0.052 -0.053 0.104 -0.08 0.155 c -2.961 5.909 -11.41 20.193 -20.353 35.309 l -4.382 7.413 C 47.725 89.252 46.415 90 45 90 z" style="fill: ${col};"/>
+	<path d="M 45 45.678 c -8.474 0 -15.369 -6.894 -15.369 -15.368 S 36.526 14.941 45 14.941 c 8.474 0 15.368 6.895 15.368 15.369 S 53.474 45.678 45 45.678 z" style="fill: #ffffff;"/>
+</g>
+<text x="128" y="86" font-family="'Outfit', sans-serif" font-size="${stopFontSize}" font-weight="bold" fill="black" text-anchor="middle" dominant-baseline="central">${stopText}</text>
+</svg>`;
+                    const customIcon = L.divIcon({
+                        html: svgHtml,
+                        className: 'custom-route-icon-svg',
+                        iconSize: [38, 38],
+                        iconAnchor: [19, 38]
+                    });
+
+                    const marker = L.marker(point.centroid, {
+                        pane: 'routePane',
+                        icon: customIcon
+                    }).addTo(map);
+
+                    marker.bindTooltip(`
+                        <div style="font-family:'Outfit',sans-serif; font-weight:700;">
+                            Stop ${idx + 1}: ${point.name}
+                        </div>
+                    `);
+
+                    routeMarkers.push(marker);
+                });
+            }
+
+            applyRouteFocusStyle();
+            
+            if (typeof routeNamesVisible !== 'undefined' && routeNamesVisible) {
+                showRouteNames();
+            }
+        }
+
+        // Copy route list text to clipboard
+        function copyRouteText() {
+            if (routePoints.length === 0) return;
+            const config = boundaryConfigs[currentBoundaryType];
+            const text = routePoints.map((p, idx) => {
+                if (currentBoundaryType === 'assembly') {
+                    return `${idx + 1}. ${p.name} Assembly Segment (${p.district} District)`;
+                } else {
+                    return `${idx + 1}. ${p.name} (${config.listTitle})`;
+                }
+            }).join('\n');
+            navigator.clipboard.writeText(text).then(() => {
+                alert("Route stops copied to clipboard!");
+            });
+        }
+
+        // Smooth camera flyover animations along the route stops
+        async function flyoverRoute() {
+            if (routePoints.length === 0) return;
+            const btn = document.getElementById('flyover-btn');
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Flight in Progress...';
+            btn.disabled = true;
 
             try {
-                const mapContainer = document.getElementById('map');
-
-                // Hide ALL UI controls for a clean capture
-                const hideSelectors = [
-                    '.leaflet-control-layers',
-                    '.leaflet-control-zoom',
-                    '.leaflet-control-attribution',
-                    '.map-legend',
-                    '#city-header-overlay',
-                    '.mode-selector-container'
-                ];
-                const hiddenEls = [];
-                hideSelectors.forEach(sel => {
-                    const el = document.querySelector(sel);
-                    if (el) {
-                        hiddenEls.push({ el, prev: el.style.display });
-                        el.style.display = 'none';
-                    }
-                });
-
-                await new Promise(r => setTimeout(r, 300));
-
-                const canvas = await html2canvas(mapContainer, {
-                    useCORS: true,
-                    allowTaint: true,
-                    scale: 2,
-                    logging: false,
-                    backgroundColor: '#f1f5f9'
-                });
-
-                // Restore hidden elements
-                hiddenEls.forEach(({ el, prev }) => {
-                    el.style.display = prev;
-                });
-
-                const { jsPDF } = window.jspdf;
-                const mapImgWidth = canvas.width;
-                const mapImgHeight = canvas.height;
-
-                // Create PDF in landscape
-                const pdf = new jsPDF({
-                    orientation: 'landscape',
-                    unit: 'px',
-                    format: [mapImgWidth, mapImgHeight],
-                    hotfixes: ['px_scaling']
-                });
-
-                // Draw the map image
-                pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, mapImgWidth, mapImgHeight);
-
-                // Draw a beautiful floating glassmorphic header card at the top center
-                const typeLabel = currentView === 'city' ? getLocalBodyTypeLabel(selectedCityFeature.properties.code) : '';
-                const cityNameText = currentMode === 'caste'
-                    ? 'PUNJAB CASTE MAP'
-                    : (currentView === 'city' ? `${selectedCityFeature.properties.name} - ${typeLabel}` : 'PUNJAB STATE');
-                
-                // Dynamically adjust header card width based on text length to prevent overflow
-                const headerWidth = currentMode === 'caste' ? 260 : (currentView === 'city' ? 360 : 260);
-                const headerHeight = 65;
-                const headerX = (mapImgWidth - headerWidth) / 2;
-                const headerY = 25;
-
-                // Card background (white with soft rounded corners and gray border)
-                pdf.setFillColor(255, 255, 255);
-                pdf.setDrawColor(226, 232, 240); // slate-200
-                pdf.setLineWidth(1);
-                pdf.roundedRect(headerX, headerY, headerWidth, headerHeight, 8, 8, 'FD');
-
-                // Draw City Name & Type in bold (using dynamic sizing to fit)
-                pdf.setFont('helvetica', 'bold');
-                pdf.setFontSize(cityNameText.length > 28 ? 13 : 15);
-                pdf.setTextColor(15, 23, 42); // slate-900
-                pdf.text(cityNameText, mapImgWidth / 2, headerY + 24, { align: 'center' });
-
-                // Draw a beautiful orange underline directly under the city name
-                pdf.setDrawColor(249, 115, 22); // Vibrant Orange (#f97316)
-                pdf.setLineWidth(2.5);
-                const underlineWidth = 50;
-                pdf.line(mapImgWidth / 2 - underlineWidth / 2, headerY + 30, mapImgWidth / 2 + underlineWidth / 2, headerY + 30);
-
-                // Draw subtitle in modern gray
-                pdf.setFont('helvetica', 'normal');
-                pdf.setFontSize(10);
-                pdf.setTextColor(100, 116, 139); // slate-500
-                const subtitle = currentMode === 'caste'
-                    ? `${selectedCaste.toUpperCase()} DISTRIBUTION`
-                    : (currentView === 'city' ? 'WARD ELECTION RESULTS' : 'CIVIC ELECTION RESULTS 2026');
-                pdf.text(subtitle, mapImgWidth / 2, headerY + 48, { align: 'center' });
-
-                // Draw the legend box at top-right
-                const legendPadding = 14;
-                const rowHeight = 22;
-                const legendBoxWidth = 210;
-                
-                let activeParties = [];
-                let casteLegendSteps = [];
-                let legendBoxHeight = 0;
-                
-                if (currentMode === 'caste') {
-                    let activeLayerObj = null;
-                    if (activeCasteLayer === 'district') activeLayerObj = districtLayer;
-                    else if (activeCasteLayer === 'ac') activeLayerObj = assemblyLayer;
-                    else if (activeCasteLayer === 'pc') activeLayerObj = parliamentLayer;
-                    else if (activeCasteLayer === 'od') activeLayerObj = odLayer;
-                    
-                    let minVal = 0.0, maxVal = 100.0;
-                    if (activeLayerObj) {
-                        const values = [];
-                        activeLayerObj.eachLayer(l => {
-                            const pct = getCastePercentage(activeCasteLayer, l.feature, selectedCaste);
-                            values.push(pct);
-                        });
-                        maxVal = Math.max(...values, 0.1);
-                        minVal = Math.min(...values, 0.0);
-                    }
-                    
-                    const fixedRanges = [
-                        { label: '0%', val: 0 },
-                        { label: '0 – 10%', val: 5 },
-                        { label: '10 – 20%', val: 15 },
-                        { label: '20 – 30%', val: 25 },
-                        { label: '30 – 40%', val: 35 },
-                        { label: '40 – 50%', val: 45 }
-                    ];
-                    for (const range of fixedRanges) {
-                        const color = getColorForPercentage(range.val, 0, 50);
-                        casteLegendSteps.push({ val: range.val, color, label: range.label });
-                    }
-                    legendBoxHeight = 35 + casteLegendSteps.length * rowHeight;
-                } else {
-                    activeParties = getActivePartiesForPDF();
-                    legendBoxHeight = 35 + activeParties.length * rowHeight;
+                for (let i = 0; i < routePoints.length; i++) {
+                    const pt = routePoints[i];
+                    selectConstituency(pt.acNo);
+                    map.setView(pt.centroid, 11, { animate: true, duration: 1.5 });
+                    await new Promise(r => setTimeout(r, 3500));
                 }
-
-                const legendX = mapImgWidth - legendBoxWidth - 30;
-                const legendY = 25; // Perfectly aligned with the header card at the top
-
-                // Card background (white with soft rounded corners and gray border)
-                pdf.setFillColor(255, 255, 255);
-                pdf.setDrawColor(226, 232, 240); // slate-200
-                pdf.setLineWidth(1);
-                pdf.roundedRect(legendX, legendY, legendBoxWidth, legendBoxHeight, 8, 8, 'FD');
-
-                // Legend title in small gray caps
-                pdf.setFont('helvetica', 'bold');
-                pdf.setFontSize(9);
-                pdf.setTextColor(100, 116, 139); // slate-500
-                const legendTitleText = currentMode === 'caste' ? `${selectedCaste.toUpperCase()} %` : 'PARTY BREAKDOWN';
-                const truncatedTitle = legendTitleText.length > 25 ? legendTitleText.substring(0, 22) + '...' : legendTitleText;
-                pdf.text(truncatedTitle, legendX + legendPadding, legendY + 18);
-
-                // Divider line
-                pdf.setDrawColor(241, 245, 249); // slate-100
-                pdf.line(legendX + legendPadding, legendY + 24, legendX + legendBoxWidth - legendPadding, legendY + 24);
-
-                // Draw rows
-                if (currentMode === 'caste') {
-                    casteLegendSteps.forEach((step, i) => {
-                        const y = legendY + 38 + i * rowHeight;
-                        const rgb = colorToRgb(step.color);
-                        pdf.setFillColor(rgb[0], rgb[1], rgb[2]);
-                        pdf.roundedRect(legendX + legendPadding, y - 9, 12, 12, 2, 2, 'F');
-                        
-                        pdf.setFont('helvetica', 'normal');
-                        pdf.setFontSize(10);
-                        pdf.setTextColor(15, 23, 42); // slate-900
-                        pdf.text(step.label || `${step.val.toFixed(1)}%`, legendX + legendPadding + 18, y + 1);
-                    });
-                } else {
-                    activeParties.forEach((party, i) => {
-                        const y = legendY + 38 + i * rowHeight;
-                        const hex = party.hex;
-                        const r = parseInt(hex.slice(1,3), 16);
-                        const g = parseInt(hex.slice(3,5), 16);
-                        const b = parseInt(hex.slice(5,7), 16);
-                        pdf.setFillColor(r, g, b);
-                        pdf.roundedRect(legendX + legendPadding, y - 9, 12, 12, 2, 2, 'F');
-                        
-                        pdf.setFont('helvetica', 'normal');
-                        pdf.setFontSize(10);
-                        pdf.setTextColor(15, 23, 42); // slate-900
-                        const labelText = `${party.label} — ${party.wins} ${party.wins === 1 ? 'Ward' : 'Wards'}`;
-                        pdf.text(labelText, legendX + legendPadding + 18, y + 1);
-                    });
-                }
-
-                const fileName = currentMode === 'caste'
-                    ? `Punjab_Caste_Map_${selectedCaste.replace(/\s+/g, '_')}.pdf`
-                    : (currentView === 'city' ? `Punjab_Election_${selectedCityName}_Wards.pdf` : 'Punjab_Civic_Elections_2026_Map.pdf');
-
-                pdf.save(fileName);
-            } catch (err) {
-                console.error('PDF generation error:', err);
-                alert('PDF generation failed. Please try again.');
+                map.setView([31.1471, 75.3412], 8, { animate: true, duration: 1.5 });
             } finally {
-                btn.innerHTML = originalText;
-                btn.classList.remove('loading');
+                btn.innerHTML = '<i class="fa-solid fa-plane"></i> Flyover Route';
+                btn.disabled = false;
             }
+        }
+
+        async function downloadRoutePDF() {
+            const btn = document.getElementById('route-download-pdf-btn');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Preparing Print...';
+            
+            const originalCenter = map.getCenter();
+            const originalZoom = map.getZoom();
+            
+            document.body.classList.add('print-mode');
+            map.invalidateSize();
+            
+            let printBounds = null;
+            if (typeof routePoints !== 'undefined' && routePoints.length > 0) {
+                const latlngs = routePoints.map(p => p.centroid);
+                if (latlngs.length > 0) {
+                    printBounds = L.latLngBounds(latlngs);
+                }
+            } else if (selectedAcNo && assemblyLayers[selectedAcNo]) {
+                printBounds = assemblyLayers[selectedAcNo].getBounds();
+            }
+            
+            if (printBounds) {
+                map.fitBounds(printBounds, { padding: [50, 50], animate: false });
+            } else if (activeLayerGroup) {
+                map.fitBounds(activeLayerGroup.getBounds(), { padding: [50, 50], animate: false });
+            }
+            
+            setTimeout(() => {
+                window.print();
+                
+                document.body.classList.remove('print-mode');
+                map.invalidateSize();
+                map.setView(originalCenter, originalZoom, { animate: false });
+                btn.innerHTML = originalText;
+            }, 1000);
+        }
+
+        function getVisualCenter(feature, fallbackLayer) {
+            try {
+                let bestPoly = null;
+                if (feature.geometry.type === 'Polygon') {
+                    bestPoly = feature.geometry.coordinates;
+                } else if (feature.geometry.type === 'MultiPolygon') {
+                    let maxArea = -1;
+                    feature.geometry.coordinates.forEach(poly => {
+                        const area = turf.area(turf.polygon(poly));
+                        if (area > maxArea) {
+                            maxArea = area;
+                            bestPoly = poly;
+                        }
+                    });
+                }
+                if (bestPoly) {
+                    const p = poleOfInaccessibility(bestPoly, 0.01);
+                    return [p[1], p[0]]; // Leaflet uses [lat, lng]
+                }
+            } catch(e) {
+                console.error("Custom center failed", e);
+            }
+            return fallbackLayer.getBounds().getCenter();
+        }
+
+        // POI algorithm for Leaflet labels
+        function poleOfInaccessibility(polygon, precision) {
+            precision = precision || 1.0;
+            let minX, minY, maxX, maxY;
+            for (let i = 0; i < polygon[0].length; i++) {
+                const p = polygon[0][i];
+                if (!i || p[0] < minX) minX = p[0];
+                if (!i || p[1] < minY) minY = p[1];
+                if (!i || p[0] > maxX) maxX = p[0];
+                if (!i || p[1] > maxY) maxY = p[1];
+            }
+            const width = maxX - minX;
+            const height = maxY - minY;
+            const cellSize = Math.min(width, height);
+            let h = cellSize / 2;
+            if (cellSize === 0) return [minX, minY];
+
+            const cellQueue = [];
+            for (let x = minX; x < maxX; x += cellSize) {
+                for (let y = minY; y < maxY; y += cellSize) {
+                    cellQueue.push(new PoiCell(x + h, y + h, h, polygon));
+                }
+            }
+
+            let bestCell = getCentroidCell(polygon);
+            const bboxCell = new PoiCell(minX + width / 2, minY + height / 2, 0, polygon);
+            if (bboxCell.d > bestCell.d) bestCell = bboxCell;
+
+            while (cellQueue.length) {
+                cellQueue.sort((a, b) => a.max - b.max);
+                const cell = cellQueue.pop();
+                if (cell.d > bestCell.d) bestCell = cell;
+                if (cell.max - bestCell.d <= precision) continue;
+
+                h = cell.h / 2;
+                cellQueue.push(new PoiCell(cell.x - h, cell.y - h, h, polygon));
+                cellQueue.push(new PoiCell(cell.x + h, cell.y - h, h, polygon));
+                cellQueue.push(new PoiCell(cell.x - h, cell.y + h, h, polygon));
+                cellQueue.push(new PoiCell(cell.x + h, cell.y + h, h, polygon));
+            }
+            return [bestCell.x, bestCell.y];
+        }
+
+        function PoiCell(x, y, h, polygon) {
+            this.x = x; this.y = y; this.h = h;
+            this.d = pointToPolygonDist(x, y, polygon);
+            this.max = this.d + this.h * Math.SQRT2;
+        }
+
+        function pointToPolygonDist(x, y, polygon) {
+            let inside = false;
+            let minDistSq = Infinity;
+            for (let k = 0; k < polygon.length; k++) {
+                const ring = polygon[k];
+                for (let i = 0, len = ring.length, j = len - 1; i < len; j = i++) {
+                    const a = ring[i], b = ring[j];
+                    if ((a[1] > y !== b[1] > y) && (x < (b[0] - a[0]) * (y - a[1]) / (b[1] - a[1]) + a[0])) inside = !inside;
+                    minDistSq = Math.min(minDistSq, getSegDistSq(x, y, a, b));
+                }
+            }
+            return minDistSq === 0 ? 0 : (inside ? 1 : -1) * Math.sqrt(minDistSq);
+        }
+
+        function getCentroidCell(polygon) {
+            let area = 0, x = 0, y = 0;
+            const points = polygon[0];
+            for (let i = 0, len = points.length, j = len - 1; i < len; j = i++) {
+                const a = points[i], b = points[j];
+                const f = a[0] * b[1] - b[0] * a[1];
+                x += (a[0] + b[0]) * f;
+                y += (a[1] + b[1]) * f;
+                area += f * 3;
+            }
+            if (area === 0) return new PoiCell(points[0][0], points[0][1], 0, polygon);
+            return new PoiCell(x / area, y / area, 0, polygon);
+        }
+
+        function getSegDistSq(px, py, a, b) {
+            let x = a[0], y = a[1];
+            let dx = b[0] - x, dy = b[1] - y;
+            if (dx !== 0 || dy !== 0) {
+                const t = ((px - x) * dx + (py - y) * dy) / (dx * dx + dy * dy);
+                if (t > 1) { x = b[0]; y = b[1]; } 
+                else if (t > 0) { x += dx * t; y += dy * t; }
+            }
+            dx = px - x; dy = py - y;
+            return dx * dx + dy * dy;
+        }
+
+        function toggleRouteBoundaryNames() {
+            const btn = document.getElementById('route-toggle-names-btn');
+            routeBoundaryLabelsVisible = !routeBoundaryLabelsVisible;
+            
+            if (routeBoundaryLabelsVisible) {
+                btn.classList.add('active');
+                btn.innerHTML = '<i class="fa-solid fa-font"></i> Hide Names';
+                addRouteBoundaryNameLabels();
+            } else {
+                btn.classList.remove('active');
+                btn.innerHTML = '<i class="fa-solid fa-font"></i> Show Names';
+                clearRouteBoundaryNameLabels();
+            }
+        }
+
+        function addRouteBoundaryNameLabels() {
+            clearRouteBoundaryNameLabels();
+            const config = boundaryConfigs[currentBoundaryType];
+            const allRouteAcNos = getAllActiveRouteAcNos();
+            if (activeLayerGroup) {
+                activeLayerGroup.eachLayer(l => {
+                    const props = l.feature.properties;
+                    const acNo = config.getId(l.feature);
+
+                    // If focus mode is active, only show labels for constituencies in any active route
+                    if (routeFocusActive && !allRouteAcNos.has(acNo)) {
+                        return;
+                    }
+
+                    const name = config.getName(l.feature) || "Unknown";
+                    const center = getVisualCenter(l.feature, l);
+
+                    const label = L.tooltip({
+                        permanent: true,
+                        direction: 'center',
+                        className: 'boundary-name-label'
+                    });
+                    label.setContent(name);
+                    label.setLatLng(center);
+                    label.addTo(map);
+                    routeBoundaryNameLabels.push(label);
+                });
+            }
+        }
+
+        function clearRouteBoundaryNameLabels() {
+            routeBoundaryNameLabels.forEach(label => map.removeLayer(label));
+            routeBoundaryNameLabels = [];
+        }
+
+        function getAllActiveRouteAcNos() {
+            const acNos = new Set(routePoints.map(p => p.acNo));
+            if (typeof activeRouteIndices !== 'undefined') {
+                activeRouteIndices.forEach(idx => {
+                    const r = savedRoutes[idx];
+                    if (r) r.acNos.forEach(ac => acNos.add(ac));
+                });
+            }
+            return acNos;
+        }
+
+        function toggleRouteNames() {
+            const btn = document.getElementById('show-route-names-btn');
+            routeNamesVisible = !routeNamesVisible;
+
+            if (routeNamesVisible) {
+                btn.classList.add('active');
+                btn.innerHTML = '<i class="fa-solid fa-font"></i> Hide Names';
+                showRouteNames();
+            } else {
+                btn.classList.remove('active');
+                btn.innerHTML = '<i class="fa-solid fa-font"></i> Names';
+                clearRouteNames();
+            }
+        }
+
+        function showRouteNames() {
+            clearRouteNames();
+            const config = boundaryConfigs[currentBoundaryType];
+            const allRouteAcNos = getAllActiveRouteAcNos();
+            if (allRouteAcNos.size === 0) return;
+
+            if (activeLayerGroup) {
+                activeLayerGroup.eachLayer(l => {
+                    const props = l.feature.properties;
+                    const acNo = config.getId(l.feature);
+                    if (!allRouteAcNos.has(acNo)) return;
+
+                    const name = config.getName(l.feature) || "Unknown";
+                    const center = getVisualCenter(l.feature, l);
+
+                    const label = L.tooltip({
+                        permanent: true,
+                        direction: 'center',
+                        className: 'boundary-name-label'
+                    });
+                    label.setContent(name);
+                    label.setLatLng(center);
+                    label.addTo(map);
+                    routeNameLabels.push(label);
+                });
+            }
+        }
+
+        function clearRouteNames() {
+            routeNameLabels.forEach(label => map.removeLayer(label));
+            routeNameLabels = [];
+        }
+
+        function initRoutePlannerLayersOnMap() {
+            // Add custom panes for route lines and markers if they don't exist
+            if (!map.getPane('routePane')) {
+                map.createPane('routePane');
+                map.getPane('routePane').style.zIndex = 500;
+            }
+            if (!map.getPane('boundaryPane')) {
+                map.createPane('boundaryPane');
+                map.getPane('boundaryPane').style.zIndex = 400;
+            }
+
+            // Create routeLayerControl if not already created
+            if (!routeLayerControl) {
+                const routeOverlays = {
+                    "🗳️ Assembly Constituencies": assemblyLayer,
+                    "🏛️ Parliamentary Constituencies": parliamentLayer,
+                    "📍 District Boundaries": districtLayer,
+                    "🏢 Organizational Districts": odLayer
+                };
+                routeLayerControl = L.control.layers(baseMaps, routeOverlays, { collapsed: false, position: 'topright' });
+            }
+
+            routeLayerControl.addTo(map);
+
+            if (routeStateBoundaryLayer) {
+                map.removeLayer(routeStateBoundaryLayer);
+            }
+            routeStateBoundaryLayer = L.geoJSON(punjabStateBoundary, {
+                style: {
+                    fill: false,
+                    weight: 2.5,
+                    color: borderColor || '#ea580c',
+                    opacity: 0.6,
+                    dashArray: '8, 5'
+                },
+                interactive: false
+            }).addTo(map);
+
+            document.getElementById("route-map-header-panel").style.display = "block";
+            updateBoundaryLabelsIfNeeded();
+
+            switchBoundary(currentBoundaryType);
+        }
+
+        function cleanupRoutePlannerMapLayers() {
+            if (routeLayerControl) {
+                routeLayerControl.remove();
+            }
+
+            if (routeStateBoundaryLayer) {
+                map.removeLayer(routeStateBoundaryLayer);
+                routeStateBoundaryLayer = null;
+            }
+
+            if (routePolyline) {
+                map.removeLayer(routePolyline);
+                routePolyline = null;
+            }
+            if (typeof activeRoutePolylines !== 'undefined') {
+                activeRoutePolylines.forEach(layer => map.removeLayer(layer));
+                activeRoutePolylines = [];
+            }
+            if (routeMarkers) {
+                routeMarkers.forEach(m => map.removeLayer(m));
+                routeMarkers = [];
+            }
+
+            if (allSavedRoutesLayer) {
+                map.removeLayer(allSavedRoutesLayer);
+                allSavedRoutesLayer = null;
+            }
+
+            clearRouteBoundaryNameLabels();
+            clearRouteNames();
+
+            map.removeLayer(assemblyLayer);
+            map.removeLayer(parliamentLayer);
+            map.removeLayer(districtLayer);
+            map.removeLayer(odLayer);
+            
+            resetAdminLayerStyles();
+
+            document.getElementById("route-map-header-panel").style.display = "none";
+            updateBoundaryLabelsIfNeeded();
+        }
+
+        // Search Filter input listener for Route Planner
+        const routeSearchInput = document.getElementById('route-search-input');
+        if (routeSearchInput) {
+            routeSearchInput.addEventListener('input', refreshConstituencyList);
         }
 
         // Load the initial App State

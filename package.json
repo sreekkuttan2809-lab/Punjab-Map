@@ -1,0 +1,21 @@
+{
+  "name": "ppt-punjab-map",
+  "version": "1.0.0",
+  "description": "A premium, interactive web-based GIS visualization tool for the Punjab Local Body Election Results.",
+  "main": "caste_data.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sreekkuttan2809-lab/Punjab-Map.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/sreekkuttan2809-lab/Punjab-Map/issues"
+  },
+  "homepage": "https://github.com/sreekkuttan2809-lab/Punjab-Map#readme"
+}

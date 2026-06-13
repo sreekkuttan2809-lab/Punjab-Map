@@ -2549,7 +2549,7 @@
                     switchBoundary(newBoundaryType);
                 }
             } else {
-                updateLegend();
+                updateLegend(e.layer, 'add');
                 if (e.layer === assemblyLayer) {
                     updateAssemblyLayerStyle();
                 }
@@ -2557,6 +2557,7 @@
                     restoreWardLabelsToMap();
                 }
                 updateBoundaryLabelsIfNeeded();
+                updateElectionSidebar(e.layer, 'add');
             }
         });
 
@@ -2576,11 +2577,12 @@
                     selectConstituency(null, false);
                 }
             } else if (currentMode !== 'caste') {
-                updateLegend();
+                updateLegend(e.layer, 'remove');
                 if (e.layer === localBodyLayerGroup) {
                     clearWardLabelsFromMap();
                 }
                 updateBoundaryLabelsIfNeeded();
+                updateElectionSidebar(e.layer, 'remove');
             }
         });
 
@@ -3161,7 +3163,7 @@
             setActiveCasteLayer(activeCasteLayer);
         }
 
-        function updateLegend() {
+        function updateLegend(changedLayer, action) {
             if (currentMode === 'caste') {
                 let activeLayerObj = null;
                 if (activeCasteLayer === 'district') activeLayerObj = districtLayer;
@@ -3182,7 +3184,10 @@
             } else {
                 const legendDiv = document.querySelector('.map-legend');
                 if (legendDiv) {
-                    const isAssemblyActive = map.hasLayer(assemblyLayer);
+                    let isAssemblyActive = map.hasLayer(assemblyLayer);
+                    if (changedLayer === assemblyLayer) {
+                        isAssemblyActive = (action === 'add');
+                    }
                     
                     let toggleButtonHtml = "";
                     if (isAssemblyActive) {
@@ -3233,7 +3238,13 @@
             }
             assemblyColoringEnabled = !assemblyColoringEnabled;
             updateAssemblyLayerStyle();
+            if (currentMode === 'route') {
+                applyRouteFocusStyle();
+            }
             updateLegend();
+            if (typeof refreshConstituencyList === 'function') {
+                refreshConstituencyList();
+            }
         }
 
         function updateAssemblyLayerStyle() {
@@ -3748,7 +3759,7 @@
             // Zoom map out to encompass all cities
             map.fitBounds(ulbLayer.getBounds(), { padding: [30, 30] });
 
-            renderStateSidebar();
+            updateElectionSidebar();
             updateLegend();
         }
 
@@ -3791,6 +3802,176 @@
 
                 listContainer.appendChild(itemDiv);
             });
+        }
+
+        function updateElectionSidebar(changedLayer, action) {
+            if (currentMode !== 'election') return;
+            
+            const brandTitle = document.querySelector('.brand-title');
+            const brandSubtitle = document.querySelector('.brand-subtitle');
+            const searchBox = document.querySelector('.search-box');
+            const listContainer = document.getElementById("item-list");
+            
+            // Check if 🏙️ Local Body Results layer is active on the map, factoring in in-progress toggles
+            let hasLocalBody = map.hasLayer(localBodyLayerGroup);
+            if (changedLayer === localBodyLayerGroup) {
+                hasLocalBody = (action === 'add');
+            }
+            
+            let hasAssembly = map.hasLayer(assemblyLayer);
+            if (changedLayer === assemblyLayer) {
+                hasAssembly = (action === 'add');
+            }
+            
+            let hasParliament = map.hasLayer(parliamentLayer);
+            if (changedLayer === parliamentLayer) {
+                hasParliament = (action === 'add');
+            }
+            
+            if (hasLocalBody) {
+                brandTitle.innerHTML = 'Punjab Civic Polls';
+                brandSubtitle.innerHTML = 'Civic Election Results 2026';
+                searchBox.style.display = 'flex';
+                
+                if (currentView === "city" && selectedCityFeature) {
+                    renderCitySidebar(electionWardsData.features.filter(f => (f.properties.town_name || "").toUpperCase().trim() === selectedCityName));
+                } else {
+                    renderStateSidebar();
+                }
+                return;
+            }
+            
+            // If localBodyLayerGroup is NOT active, check other boundaries
+            if (hasAssembly) {
+                brandTitle.innerHTML = 'Punjab Assembly Polls';
+                brandSubtitle.innerHTML = 'ASSEMBLY ELECTION RESULTS 2022';
+                searchBox.style.display = 'none';
+                
+                // 1. Calculate overall stats
+                let features = [];
+                if (typeof assemblyElectionResults !== 'undefined') {
+                    for (let ac in assemblyElectionResults) {
+                        features.push(assemblyElectionResults[ac]);
+                    }
+                }
+                
+                // Count party wins
+                let partyWins = {};
+                features.forEach(res => {
+                    const party = getPartyShortName(res.winner_party);
+                    partyWins[party] = (partyWins[party] || 0) + 1;
+                });
+                
+                let majorityParty = "Tie / Coalition";
+                let maxWins = 0;
+                for (let party in partyWins) {
+                    if (partyWins[party] > maxWins) {
+                        maxWins = partyWins[party];
+                        majorityParty = party;
+                    }
+                }
+                
+                // 2. Update stat cards
+                document.getElementById("stat-primary").innerText = features.length;
+                document.getElementById("stat-primary-lbl").innerText = "Constituencies";
+                document.getElementById("stat-secondary").innerText = majorityParty;
+                document.getElementById("stat-secondary-lbl").innerText = "Majority Party";
+                document.getElementById("list-title-label").innerText = "Elected Members";
+                document.getElementById("list-count").innerText = features.length;
+                
+                // 3. Clear and populate the scrollable list container
+                listContainer.innerHTML = "";
+                
+                features.forEach(res => {
+                    const itemDiv = document.createElement("div");
+                    itemDiv.className = "list-item";
+                    
+                    const isAcSelected = selectedAcNo && selectedAcNo == res.ac_no;
+                    if (isAcSelected) {
+                        itemDiv.className += " active";
+                    }
+                    
+                    itemDiv.innerHTML = `
+                        <div class="item-header">
+                            <span class="item-name">${res.ac_name}</span>
+                            <span class="party-badge ${getPartyBadgeClass(res.winner_party)}" style="font-size: 9px;">${getPartyShortName(res.winner_party)}</span>
+                        </div>
+                        <div class="item-meta">
+                            <i class="fa-solid fa-user"></i>
+                            <span>${res.winner_name} (Margin: ${res.margin.toLocaleString()})</span>
+                        </div>
+                    `;
+                    
+                    itemDiv.addEventListener("click", () => {
+                        assemblyLayer.eachLayer(l => {
+                            const acNo = l.feature.properties.AC_NO || l.feature.properties.ac_no;
+                            if (acNo == res.ac_no) {
+                                map.fitBounds(l.getBounds(), { padding: [50, 50] });
+                                showAssemblyDetailedResult(l.feature, l);
+                            }
+                        });
+                    });
+                    
+                    listContainer.appendChild(itemDiv);
+                });
+                
+            } else if (hasParliament) {
+                brandTitle.innerHTML = 'Punjab Parliament Polls';
+                brandSubtitle.innerHTML = 'PARLIAMENT CONSTITUENCIES';
+                searchBox.style.display = 'none';
+                
+                const listContainer = document.getElementById("item-list");
+                listContainer.innerHTML = "";
+                
+                const features = [...punjabParliamentData.features];
+                features.sort((a, b) => (a.properties.PC_NAME || "").localeCompare(b.properties.PC_NAME || ""));
+                
+                document.getElementById("stat-primary").innerText = features.length;
+                document.getElementById("stat-primary-lbl").innerText = "Constituencies";
+                document.getElementById("stat-secondary").innerText = "-";
+                document.getElementById("stat-secondary-lbl").innerText = "Results Pending";
+                document.getElementById("list-title-label").innerText = "Parliamentary Seats";
+                document.getElementById("list-count").innerText = features.length;
+                
+                features.forEach(feat => {
+                    const p = feat.properties;
+                    const itemDiv = document.createElement("div");
+                    itemDiv.className = "list-item";
+                    const titleCasedPcName = p.PC_NAME.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+                    itemDiv.innerHTML = `
+                        <div class="item-header">
+                            <span class="item-name">${titleCasedPcName}</span>
+                            <span style="font-size: 10px; font-weight:700; color:#cbd5e1;">PC ${p.PC_NO}</span>
+                        </div>
+                        <div class="item-meta">
+                            <i class="fa-solid fa-location-dot"></i>
+                            <span>Parliamentary Constituency</span>
+                        </div>
+                    `;
+                    
+                    itemDiv.addEventListener("click", () => {
+                        parliamentLayer.eachLayer(l => {
+                            if (l.feature.properties.PC_NO === p.PC_NO) {
+                                map.fitBounds(l.getBounds(), { padding: [50, 50] });
+                                l.openTooltip();
+                            }
+                        });
+                    });
+                    listContainer.appendChild(itemDiv);
+                });
+                
+            } else {
+                // Fallback: If neither are checked, restore the default view
+                brandTitle.innerHTML = 'Punjab Civic Polls';
+                brandSubtitle.innerHTML = 'Civic Election Results 2026';
+                searchBox.style.display = 'flex';
+                
+                if (currentView === "city" && selectedCityFeature) {
+                    renderCitySidebar(electionWardsData.features.filter(f => (f.properties.town_name || "").toUpperCase().trim() === selectedCityName));
+                } else {
+                    renderStateSidebar();
+                }
+            }
         }
 
         // ==========================================
@@ -4630,17 +4811,28 @@
                 }
             }
 
+            let defaultFillColor = isSelected ? 'rgba(234, 88, 12, 0.15)' : 'transparent';
+            let defaultFillOpacity = isSelected ? 1 : 0;
+            
+            if (!isInRoute && currentBoundaryType === 'assembly' && assemblyColoringEnabled) {
+                const result = typeof assemblyElectionResults !== 'undefined' ? assemblyElectionResults[acNo] : null;
+                if (result) {
+                    defaultFillColor = hexToRgba(getPartyColor(result.winner_party), isSelected ? 0.75 : 0.5);
+                    defaultFillOpacity = 1;
+                }
+            }
+
             return {
                 pane: 'boundaryPane',
                 fill: true,
                 fillColor: isInRoute 
                     ? hexToRgba(rFillCol, isSelected ? Math.min(1.0, fillOpacity + 0.15) : fillOpacity) 
-                    : (isSelected ? 'rgba(234, 88, 12, 0.15)' : 'transparent'),
-                fillOpacity: 1,
+                    : defaultFillColor,
+                fillOpacity: isInRoute ? 1 : defaultFillOpacity,
                 weight: isSelected ? borderWeight + 1.5 : (isInRoute ? borderWeight + 1 : borderWeight),
                 color: isSelected 
                     ? '#f97316' 
-                    : borderColor,
+                    : (currentBoundaryType === 'assembly' && assemblyColoringEnabled ? '#be123c' : borderColor),
                 opacity: 1
             };
         }
@@ -4841,7 +5033,7 @@
                         const layer = ev.target;
                         layer.setStyle({
                             weight: type === 'assembly' ? borderWeight + 1.0 : borderWeight + 1.5,
-                            color: (id == selectedAcNo) ? '#f97316' : borderColor,
+                            color: (id == selectedAcNo) ? '#f97316' : (type === 'assembly' && assemblyColoringEnabled ? '#be123c' : borderColor),
                             opacity: 1
                         });
                         if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
@@ -4854,7 +5046,7 @@
                         const layer = ev.target;
                         layer.setStyle({
                             weight: type === 'assembly' ? borderWeight : borderWeight + 0.5,
-                            color: (id == selectedAcNo) ? '#f97316' : borderColor,
+                            color: (id == selectedAcNo) ? '#f97316' : (type === 'assembly' && assemblyColoringEnabled ? '#be123c' : borderColor),
                             opacity: type === 'assembly' ? 0.8 : 0.85
                         });
                     });
@@ -4936,10 +5128,26 @@
                 }
 
                 let labelBadge = "";
-                if (currentBoundaryType === 'assembly') labelBadge = `AC ${item.acNo}`;
-                else if (currentBoundaryType === 'parliament') labelBadge = `PC ${item.acNo}`;
-                else if (currentBoundaryType === 'district') labelBadge = `District`;
-                else labelBadge = `Org Dist`;
+                let borderLeftVal = "";
+                if (currentBoundaryType === 'assembly') {
+                    const result = typeof assemblyElectionResults !== 'undefined' ? assemblyElectionResults[item.acNo] : null;
+                    if (assemblyColoringEnabled && result) {
+                        labelBadge = `<span class="party-badge ${getPartyBadgeClass(result.winner_party)}" style="font-size: 9px;">${getPartyShortName(result.winner_party)} Win</span>`;
+                        borderLeftVal = `4px solid ${getPartyColor(result.winner_party)}`;
+                    } else {
+                        labelBadge = `AC ${item.acNo}`;
+                    }
+                } else if (currentBoundaryType === 'parliament') {
+                    labelBadge = `PC ${item.acNo}`;
+                } else if (currentBoundaryType === 'district') {
+                    labelBadge = `District`;
+                } else {
+                    labelBadge = `Org Dist`;
+                }
+
+                if (borderLeftVal) {
+                    div.style.borderLeft = borderLeftVal;
+                }
 
                 let metaHtml = "";
                 if (currentBoundaryType === 'assembly') {
